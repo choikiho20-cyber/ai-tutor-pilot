@@ -576,7 +576,7 @@
 <div class="app">
   <aside class="sidebar" id="sidebar">
     <h1><span class="logo-badge">🧑‍🏫</span> 우리 아이 과외쌤</h1>
-    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v14)</span></div>
+    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v15)</span></div>
 
     <fieldset>
       <legend>모드</legend>
@@ -1635,6 +1635,9 @@ el('#examPredictBtn').addEventListener('click', () => {
   sendMessage();
 });
 
+// 주소를 입력하는 즉시 목소리 목록이 나타나게
+el('#ttsProxy').addEventListener('input', updateVoicePicker);
+
 el('#voiceOutToggle').addEventListener('change', (e) => {
   state.voiceOut = e.target.checked;
   saveSettings();
@@ -1776,15 +1779,17 @@ const PREVIEW_TEXT = '안녕! 오늘은 뭐부터 공부해볼까? 모르는 거
 let previewAudio = null;
 
 async function previewVoice(voiceId, btn) {
-  if (!state.ttsProxy) {
-    alert('먼저 위 칸에 목소리 서버 주소를 넣고 "설정 적용"을 눌러주세요.');
+  // 아직 "설정 적용"을 안 눌렀어도 입력칸에 적힌 주소로 바로 들려준다
+  const proxy = (el('#ttsProxy') ? el('#ttsProxy').value.trim() : '') || state.ttsProxy;
+  if (!proxy) {
+    alert('먼저 위 칸에 목소리 서버 주소를 넣어주세요.');
     return;
   }
   if (previewAudio) { previewAudio.pause(); previewAudio = null; }
   const original = btn.textContent;
   btn.textContent = '…';
   try {
-    const res = await fetch(state.ttsProxy.replace(/\/+$/, ''), {
+    const res = await fetch(proxy.replace(/\/+$/, ''), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: PREVIEW_TEXT, lang: 'ko-KR', voice: 'ko-KR-Chirp3-HD-' + voiceId })
@@ -1835,8 +1840,11 @@ function renderVoiceList() {
 }
 
 function updateVoicePicker() {
-  el('#voicePickerWrap').classList.toggle('hidden', !state.ttsProxy);
-  if (state.ttsProxy) renderVoiceList();
+  // 입력칸에 주소가 있으면 "설정 적용"을 누르기 전이라도 바로 목록을 보여준다
+  const typed = el('#ttsProxy') ? el('#ttsProxy').value.trim() : '';
+  const proxy = typed || state.ttsProxy;
+  el('#voicePickerWrap').classList.toggle('hidden', !proxy);
+  if (proxy) renderVoiceList();
 }
 
 // 연결 설정: 다 채워졌으면 접어두고, 안 됐으면 펼쳐서 보여준다
