@@ -348,6 +348,12 @@
     font-size: 17px;
   }
   .mic-btn:hover { border-color: var(--accent) !important; }
+  .lang-btn {
+    font-size: 13px !important;
+    font-weight: 700;
+    width: 38px;
+    color: var(--accent) !important;
+  }
   .mic-btn.recording {
     background: #ef4444 !important;
     border-color: #ef4444 !important;
@@ -583,7 +589,7 @@
 <div class="app">
   <aside class="sidebar" id="sidebar">
     <h1><span class="logo-badge">🧑‍🏫</span> 우리 아이 과외쌤</h1>
-    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v18)</span></div>
+    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v19)</span></div>
 
     <fieldset>
       <legend>모드</legend>
@@ -735,6 +741,7 @@
       <input type="file" id="imageInput" accept="image/*" capture="environment" class="hidden">
       <button id="cameraBtn" class="mic-btn" type="button" title="문제 사진 첨부">📷</button>
       <textarea id="input" placeholder="어떤 과목이든 물어보세요! 예: 무신정변이 왜 일어났어?" rows="1"></textarea>
+      <button id="micLangBtn" class="mic-btn lang-btn" type="button" title="마이크가 알아들을 언어 (눌러서 바꾸기)">한</button>
       <button id="micBtn" class="mic-btn" type="button" title="음성으로 말하기">🎤</button>
       <button id="sendBtn">보내기</button>
     </div>
@@ -1008,6 +1015,19 @@ function renderMeta() {
   }
 }
 
+// 마이크가 알아들을 언어. 모드에 따라 기본값이 정해지지만 버튼으로 바꿀 수 있다.
+var micLang = 'ko-KR';
+function setMicLang(lang) {
+  micLang = lang;
+  const btn = el('#micLangBtn');
+  if (btn) {
+    btn.textContent = lang === 'en-US' ? 'EN' : '한';
+    btn.title = lang === 'en-US'
+      ? '지금은 영어를 알아들어요 (눌러서 한국어로)'
+      : '지금은 한국어를 알아들어요 (눌러서 영어로)';
+  }
+}
+
 function updateModeUI() {
   const isConversation = state.mode === 'conversation';
   const isLesson = state.mode === 'lesson';
@@ -1030,6 +1050,9 @@ function updateModeUI() {
     : isLesson
       ? '배우고 싶은 걸 말해보세요! 예: 이차방정식 배우고 싶어'
       : '어떤 과목이든 물어보세요! 예: 무신정변이 왜 일어났어?';
+
+  // 모드를 바꾸면 마이크 언어도 그 모드에 맞는 기본값으로 되돌린다
+  setMicLang(isConversation ? 'en-US' : 'ko-KR');
 
   const isElementary = gradeBand(state.grade) === 'elementary';
   el('#guardianBanner').classList.toggle('hidden', !isElementary);
@@ -1983,7 +2006,7 @@ if (SpeechRecognitionCtor) {
     userStopped = false;
     baseText = el('#input').value.trim();
     finalText = '';
-    recognition.lang = state.mode === 'conversation' ? 'en-US' : 'ko-KR';
+    recognition.lang = micLang;
     try { recognition.start(); } catch (e) { /* 이미 켜져있으면 무시 */ }
   }
 
@@ -1994,6 +2017,12 @@ if (SpeechRecognitionCtor) {
 
   el('#micBtn').addEventListener('click', () => {
     if (listening) stopListening(); else startListening();
+  });
+
+  // 마이크 언어 바꾸기 (듣는 중이면 새 언어로 다시 시작)
+  el('#micLangBtn').addEventListener('click', () => {
+    setMicLang(micLang === 'en-US' ? 'ko-KR' : 'en-US');
+    if (listening) { stopListening(); setTimeout(startListening, 250); }
   });
 
   recognition.addEventListener('start', () => {
