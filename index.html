@@ -367,6 +367,60 @@
     text-align: center;
     border-bottom: 1px solid #fde68a;
   }
+  /* 설정이 끝난 항목은 접어서, 처음 보는 사람이 압도되지 않게 한다 */
+  details.setup-group {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0;
+    margin: 0 0 18px;
+    background: #fff;
+  }
+  details.setup-group > summary {
+    cursor: pointer;
+    padding: 11px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-radius: 10px;
+  }
+  details.setup-group > summary::-webkit-details-marker { display: none; }
+  details.setup-group > summary::after {
+    content: '▾';
+    color: var(--sub);
+    font-size: 11px;
+    transition: transform 0.15s ease;
+  }
+  details.setup-group[open] > summary::after { transform: rotate(180deg); }
+  details.setup-group .group-body { padding: 0 14px 14px; }
+  details.setup-group .group-body fieldset:last-child { margin-bottom: 0; }
+  .setup-status {
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--sub);
+    margin-left: 8px;
+  }
+  .setup-status.done { color: #1f7a4d; }
+  .file-drop {
+    border: 1.5px dashed var(--border);
+    border-radius: 10px;
+    padding: 14px 10px;
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--sub);
+    cursor: pointer;
+    background: #fafaf7;
+    transition: border-color 0.15s ease, background 0.15s ease;
+    margin-bottom: 8px;
+  }
+  .file-drop:hover, .file-drop.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .file-drop strong { display: block; margin-bottom: 2px; font-size: 13px; color: var(--ink); }
   body.simple-mode .bubble { font-size: 17px; line-height: 1.75; }
   body.simple-mode .quick-btn { font-size: 14px; padding: 9px 16px; }
   body.simple-mode .composer textarea { font-size: 16px; }
@@ -414,9 +468,14 @@
     </fieldset>
 
     <fieldset id="timetableField">
-      <legend>시간표 (선택, 요일: 과목 형식으로 한 줄씩)</legend>
+      <legend>시간표 (선택)</legend>
+      <input type="file" id="timetableImageInput" accept="image/*" class="hidden">
+      <div class="file-drop" id="timetableDrop">
+        <strong>📷 시간표 사진 올리기</strong>
+        사진을 끌어다 놓거나 눌러서 선택하면 자동으로 읽어드려요
+      </div>
       <textarea id="timetable" rows="5" placeholder="월: 국어,수학,영어&#10;화: 사회,과학,영어&#10;수: 수학,체육,한문&#10;목: 국어,과학,음악&#10;금: 영어,수학,사회"></textarea>
-      <div class="field-hint">넣어두면 오늘·내일 배우는 과목에 맞춰 먼저 복습·예습을 제안해줘요.</div>
+      <div class="field-hint">틀린 부분만 직접 고치시면 돼요. 넣어두면 오늘·내일 배우는 과목에 맞춰 먼저 복습·예습을 제안해줘요.</div>
     </fieldset>
 
     <fieldset>
@@ -429,24 +488,31 @@
     </fieldset>
 
     <fieldset>
-      <legend>Claude API 키</legend>
-      <input type="password" id="apiKey" placeholder="sk-ant-...">
-      <div class="field-hint">브라우저에만 저장되고 어디로도 전송되지 않아요. <a href="https://console.anthropic.com/settings/keys" target="_blank">키 발급받기</a></div>
-    </fieldset>
-
-    <fieldset>
       <legend>음성</legend>
       <label class="voice-label">
         <input type="checkbox" id="voiceOutToggle"> 선생님 답변을 음성으로 듣기
       </label>
     </fieldset>
 
-    <fieldset>
-      <legend>부모님 알림 (선택, 텔레그램)</legend>
-      <input type="text" id="telegramToken" placeholder="봇 토큰 (예: 123456:ABC-...)">
-      <input type="text" id="telegramChatId" placeholder="채팅 ID" style="margin-top:6px;">
-      <div class="field-hint">텔레그램에서 @BotFather로 봇을 만들어 토큰을 받고, 그 봇에게 메시지를 한 번 보낸 뒤 브라우저로 https://api.telegram.org/bot(토큰)/getUpdates 를 열면 채팅ID를 확인할 수 있어요.</div>
-    </fieldset>
+    <details class="setup-group" id="connectGroup">
+      <summary>
+        <span>🔌 연결 설정 <span class="setup-status" id="connectStatus">아직 안 됨</span></span>
+      </summary>
+      <div class="group-body">
+        <fieldset>
+          <legend>Claude API 키</legend>
+          <input type="password" id="apiKey" placeholder="sk-ant-...">
+          <div class="field-hint">브라우저에만 저장되고 어디로도 전송되지 않아요. <a href="https://console.anthropic.com/settings/keys" target="_blank">키 발급받기</a></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>부모님 알림 (선택, 텔레그램)</legend>
+          <input type="password" id="telegramToken" placeholder="봇 토큰 (예: 123456:ABC-...)">
+          <input type="text" id="telegramChatId" placeholder="채팅 ID" style="margin-top:6px;">
+          <div class="field-hint">텔레그램에서 @BotFather로 봇을 만들어 토큰을 받고, 그 봇에게 메시지를 한 번 보낸 뒤 브라우저로 https://api.telegram.org/bot(토큰)/getUpdates 를 열면 채팅ID를 확인할 수 있어요. 엄마·아빠가 함께 받으려면 텔레그램 그룹방을 만들어 봇을 초대한 뒤, 그 방의 채팅ID(마이너스로 시작하는 숫자)를 넣으세요.</div>
+        </fieldset>
+      </div>
+    </details>
 
     <button class="apply-btn" id="applyBtn">설정 적용 &amp; 대화 초기화</button>
   </aside>
@@ -823,6 +889,7 @@ el('#telegramToken').value = state.telegramToken;
 el('#telegramChatId').value = state.telegramChatId;
 renderMeta();
 updateModeUI();
+updateConnectGroup();
 
 el('#applyBtn').addEventListener('click', () => {
   state.apiKey = el('#apiKey').value.trim();
@@ -831,6 +898,7 @@ el('#applyBtn').addEventListener('click', () => {
   state.telegramChatId = el('#telegramChatId').value.trim();
   saveSettings();
   resetChat(true);
+  updateConnectGroup();
   el('#sidebar').classList.remove('open');
 });
 
@@ -896,6 +964,106 @@ el('#removeImageBtn').addEventListener('click', () => {
   pendingImage = null;
   el('#imagePreviewWrap').classList.add('hidden');
 });
+
+// 시간표 사진 자동 읽기: 사진을 Claude vision으로 보내 "요일: 과목" 형식 텍스트로 변환
+async function readTimetableImage(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const key = el('#apiKey').value.trim() || state.apiKey;
+  if (!key) {
+    alert('시간표 사진을 읽으려면 먼저 아래 "연결 설정"에서 API 키를 입력해주세요.');
+    return;
+  }
+  const drop = el('#timetableDrop');
+  const originalHTML = drop.innerHTML;
+  drop.innerHTML = '<strong>⏳ 시간표를 읽고 있어요...</strong>잠시만 기다려주세요';
+
+  try {
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const mediaType = dataUrl.slice(5, dataUrl.indexOf(';'));
+    const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-5',
+        max_tokens: 1024,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+            { type: 'text', text: '이 학교 시간표 사진을 읽어서 아래 형식으로만 답해줘. 설명이나 인사말은 절대 쓰지 말고, 표 내용만 이 형식으로 정확히 옮겨줘.\n\n월: 국어,수학,영어\n화: 사회,과학,영어\n수: 수학,체육,한문\n목: 국어,과학,음악\n금: 영어,수학,사회' }
+          ]
+        }]
+      })
+    });
+
+    if (!res.ok) throw new Error('API 오류 (' + res.status + ')');
+    const data = await res.json();
+    const text = (data.content && data.content[0] && data.content[0].text || '').trim();
+    if (!text) throw new Error('내용을 읽지 못했어요');
+
+    el('#timetable').value = text;
+    drop.innerHTML = '<strong>✅ 다 읽었어요!</strong>아래 내용에서 틀린 곳만 고쳐주세요';
+    setTimeout(() => { drop.innerHTML = originalHTML; }, 4000);
+  } catch (err) {
+    drop.innerHTML = '<strong>⚠️ 읽지 못했어요</strong>' + err.message + ' — 아래에 직접 입력해주세요';
+    setTimeout(() => { drop.innerHTML = originalHTML; }, 5000);
+  }
+}
+
+el('#timetableDrop').addEventListener('click', () => el('#timetableImageInput').click());
+el('#timetableImageInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  readTimetableImage(file);
+});
+['dragenter', 'dragover'].forEach(evt => {
+  el('#timetableDrop').addEventListener(evt, (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    el('#timetableDrop').classList.add('drag-over');
+  });
+});
+['dragleave', 'drop'].forEach(evt => {
+  el('#timetableDrop').addEventListener(evt, (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    el('#timetableDrop').classList.remove('drag-over');
+  });
+});
+el('#timetableDrop').addEventListener('drop', (e) => {
+  const file = e.dataTransfer.files && e.dataTransfer.files[0];
+  readTimetableImage(file);
+});
+
+// 연결 설정: 다 채워졌으면 접어두고, 안 됐으면 펼쳐서 보여준다
+function updateConnectGroup() {
+  const hasKey = !!state.apiKey;
+  const hasTelegram = !!(state.telegramToken && state.telegramChatId);
+  const statusEl = el('#connectStatus');
+  if (hasKey && hasTelegram) {
+    statusEl.textContent = '연결됨 · 알림 켜짐';
+    statusEl.classList.add('done');
+  } else if (hasKey) {
+    statusEl.textContent = '연결됨';
+    statusEl.classList.add('done');
+  } else {
+    statusEl.textContent = '아직 안 됨';
+    statusEl.classList.remove('done');
+  }
+  el('#connectGroup').open = !hasKey;
+}
 
 // 드래그앤드롭
 const chatCol = document.querySelector('.chat-col');
