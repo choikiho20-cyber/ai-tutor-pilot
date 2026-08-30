@@ -214,29 +214,6 @@
   .clear-btn:active { transform: scale(0.96); }
   @media (max-width: 1024px) { .menu-btn { display: block; } }
 
-  /* 손가락으로 누르는 화면(아이패드·태블릿·폰) 전용 보정 */
-  @media (pointer: coarse) {
-    /* 글자가 16px보다 작으면 사파리가 입력할 때 화면을 확대해버린다 */
-    select, input[type=password], input[type=text], #timetable,
-    .composer textarea { font-size: 16px; }
-    /* 손끝으로 눌리는 크기(44px)를 확보한다 */
-    .chip { padding: 10px 16px; font-size: 14px; }
-    .quick-btn { padding: 11px 18px; font-size: 14px; }
-    .clear-btn { padding: 10px 16px; font-size: 13px; }
-    .speak-bar button { padding: 11px 20px; font-size: 14px; }
-    .detail-box > summary { padding: 12px 0; font-size: 14px; }
-    .menu-btn { font-size: 24px; padding: 6px 10px; }
-    .image-preview button { width: 34px; height: 34px; font-size: 15px; }
-  }
-
-  /* 태블릿에서는 글씨를 조금 키운다. 폰보다 멀리 두고 보기 때문이다. */
-  @media (min-width: 600px) and (pointer: coarse) {
-    .msg.bot .bubble { font-size: 17px; line-height: 2.05; }
-    .msg.user .bubble { font-size: 16px; }
-    .point-row { font-size: 16.5px; }
-    .messages { padding: 24px; }
-  }
-
   .messages {
     flex: 1;
     overflow-y: auto;
@@ -626,13 +603,37 @@
   body.simple-mode .quick-btn { font-size: 14px; padding: 9px 16px; }
   body.simple-mode .composer textarea { font-size: 16px; }
   body.simple-mode .mic-btn, body.simple-mode #sendBtn, body.simple-mode #cameraBtn { font-size: 19px; }
+
+  /* ── 손가락으로 누르는 화면(아이패드·태블릿·폰) 보정 ──
+     위의 규칙들을 덮어써야 하므로 반드시 맨 마지막에 둔다. 위로 올리면 뒤 규칙에 밀린다. */
+  @media (pointer: coarse) {
+    /* 글자가 16px보다 작으면 입력할 때 사파리가 화면을 확대해버린다 */
+    select, input[type=password], input[type=text], #timetable,
+    .composer textarea { font-size: 16px; }
+    /* 손끝으로 눌리는 크기를 확보한다 */
+    .chip { padding: 10px 16px; font-size: 14px; }
+    .quick-btn { padding: 11px 18px; font-size: 14px; }
+    .clear-btn { padding: 10px 16px; font-size: 13px; }
+    .speak-bar button { padding: 11px 20px; font-size: 14px; }
+    .detail-box > summary { padding: 12px 0; font-size: 14px; }
+    .menu-btn { font-size: 24px; padding: 6px 10px; }
+    .image-preview button { width: 34px; height: 34px; font-size: 15px; }
+  }
+
+  /* 태블릿은 폰보다 멀리 두고 보므로 글씨를 조금 키운다 */
+  @media (min-width: 600px) and (pointer: coarse) {
+    .msg.bot .bubble { font-size: 17px; line-height: 2.05; }
+    .msg.user .bubble { font-size: 16px; }
+    .point-row { font-size: 16.5px; }
+    .messages { padding: 24px; }
+  }
 </style>
 </head>
 <body>
 <div class="app">
   <aside class="sidebar" id="sidebar">
     <h1><span class="logo-badge">🧑‍🏫</span> 우리 아이 과외쌤</h1>
-    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v22)</span></div>
+    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v23)</span></div>
 
     <fieldset>
       <legend>모드</legend>
