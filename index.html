@@ -177,6 +177,21 @@
   .chat-header .title { font-weight: 700; font-size: 16px; letter-spacing: -0.01em; }
   .chat-header .meta { font-size: 12px; color: var(--sub); margin-top: 2px; }
   .menu-btn { display: none; background: none; border: none; font-size: 20px; cursor: pointer; }
+  .clear-btn {
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--sub);
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+  }
+  .clear-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .clear-btn:active { transform: scale(0.96); }
   @media (max-width: 720px) { .menu-btn { display: block; } }
 
   .messages {
@@ -524,7 +539,7 @@
         <div class="title">중학교 전과목 과외선생님</div>
         <div class="meta" id="metaLine">중2 · 수학, 영어 · 다정하게</div>
       </div>
-      <div></div>
+      <button class="clear-btn" id="clearChatBtn" type="button" title="대화 내용 지우기">🧹 대화 지우기</button>
     </div>
     <div class="guardian-banner hidden" id="guardianBanner">👨‍👩‍👧 저학년은 보호자와 함께 사용하는 걸 권장해요</div>
     <div class="messages" id="messages"></div>
@@ -625,9 +640,9 @@ function buildSystemPrompt() {
 
   if (state.mode === 'conversation') {
     const bandNote = band === 'elementary'
-      ? '\n8. 초등학생이니 아주 쉬운 단어와 짧은 문장만 쓰고, 문법 지적은 거의 하지 말고 재미있게 대화하는 데 집중해.'
+      ? '\n8. 초등학생에게 말할 때는 아주 쉬운 단어와 짧은 문장을 쓰고, 문법 지적은 거의 하지 말고 재미있게 대화하는 데 집중해.'
       : band === 'high'
-        ? '\n8. 고등학생 수준이니 필요하면 시험·입시에 자주 나오는 표현이나 조금 더 긴 문장도 써도 돼.'
+        ? '\n8. 고등학생에게는 시험·입시에 자주 나오는 표현이나 조금 더 긴 문장도 써도 돼.'
         : '';
     return `너는 한국 ${bandLabel} ${state.grade} 학생과 영어 회화를 연습시켜주는 원어민 회화 파트너야.
 
@@ -638,7 +653,8 @@ function buildSystemPrompt() {
 4. 매 턴 끝에 짧은 후속 질문을 던져서 대화가 끊기지 않게 해.
 5. 말투: ${state.tone} 느낌을 유지해.
 6. 응답은 2~4문장 정도로 짧게, 실제 대화처럼 유지해.
-7. 이건 AI라는 걸 자연스럽게 인지할 수 있게 행동하고, 사람인 척하지 마.${bandNote}`;
+7. 이건 AI라는 걸 자연스럽게 인지할 수 있게 행동하고, 사람인 척하지 마.
+   학생이 어려운 질문(문법 원리, 어려운 단어 뜻, 학년을 넘는 표현)을 하면 회피하지 말고 정확하게 알려주되, 설명만 학생 눈높이에 맞춰서 해줘.${bandNote}`;
   }
 
   const subjectList = state.subjects.length ? state.subjects.join(', ') : '전과목';
@@ -647,25 +663,37 @@ function buildSystemPrompt() {
     ? `\n\n학생 시간표: 오늘(${todayLabel}요일)은 ${todaySubjects.join(', ') || '정보 없음'}, 내일(${tomorrowLabel}요일)은 ${tomorrowSubjects.join(', ') || '정보 없음'}을 배워. 학생이 별다른 질문 없이 인사만 하거나 대화를 시작하면, 먼저 오늘 배운 과목 복습이나 내일 배울 과목 예습을 자연스럽게 제안해줘.`
     : '';
   const bandNote = band === 'elementary'
-    ? '\n10. 초등학생이니 아주 쉬운 단어와 짧은 문장만 쓰고, 숫자나 그림으로 비유하듯 설명해. 정답 맞히기보다 재미있고 이해했다는 느낌을 주는 게 더 중요해.'
+    ? '\n- 초등학생에게 설명할 때는 아주 쉬운 단어와 짧은 문장을 쓰고, 숫자나 그림으로 비유하듯 풀어줘. 정답을 맞히는 것보다 "아 이거구나" 하고 이해하는 느낌을 주는 게 더 중요해.'
     : band === 'high'
-      ? '\n10. 고등학생 수준이니 심화 개념과 공식을 써도 되지만, 특히 수학·과학 계산은 절대 틀리면 안 되니 두 번 이상 검산하고, 근거나 풀이 과정을 명확히 밝혀.'
+      ? '\n- 고등학생에게는 심화 개념과 공식을 그대로 써도 되고, 대학 과정 개념이 필요하면 짧게 소개해도 좋아. 다만 입시·내신에서 요구하는 정확한 서술 방식과 근거 제시를 특히 신경 써.'
       : '';
   return `너는 한국 ${bandLabel} ${state.grade} 학생을 가르치는 전과목 과외선생님이야. 특히 ${subjectList} 과목을 중점적으로 봐줘.${timetableNote}
 
 말투: ${state.tone} 말투를 항상 유지해. 존댓말을 쓰되 어렵지 않게.
 
+【가장 중요한 원칙 — 너는 그 과목의 박사다】
+너는 해당 과목을 평생 연구한 박사 수준의 전문가이고, 지금 ${bandLabel} ${state.grade} 학생을 가르치러 온 것이다. 학생이 어리다고 해서 네 지식이 그 학년에 묶이는 것이 절대 아니다. 오히려 더 깊이 알기 때문에 더 쉽게, 더 정확하게 설명할 수 있는 것이다.
+
+이 원칙에서 나오는 규칙:
+- 못 푸는 문제는 없다. 경시대회 문제, 학년을 한참 넘는 문제, 대학 과정 개념이 필요한 문제 — 전부 끝까지 정확하게 풀어라.
+- "이건 ${state.grade} 과정이 아니라서 못 푼다", "너무 어렵다", "학교에서 배우면 알게 된다" 같은 회피는 절대 금지다.
+- 풀이 과정에서는 대학 수준 개념이든 고급 논리든 마음껏 동원해라. 학년 제한은 네가 '아는 범위'가 아니라 '설명하는 말투'에만 적용된다.
+- 더 높은 수준의 관점을 쓰면 오히려 훨씬 쉽게 설명되는 경우가 많다. 그럴 때는 주저하지 말고 그 관점을 가져와서, 학생이 알아들을 수 있는 말로 풀어 설명해라.
+- 학년 범위를 넘는 개념을 써야 한다면, 그 개념을 쉬운 말로 짧게 먼저 알려준 뒤 풀이를 이어가라.
+
+정리: 실력은 박사 수준 그대로, 말은 ${bandLabel} ${state.grade} 학생 눈높이로.
+
 원칙:
 1. 정답을 바로 주지 말고, 학생이 스스로 생각해볼 수 있도록 힌트→단계별 설명 순서로 진행해.
 2. 학생이 "그냥 답 알려줘"라고 강하게 요청하면 답을 주되, 반드시 풀이 과정을 함께 보여줘.
-3. 수학·과학 계산은 단계마다 검산하고, 계산 실수가 없는지 한 번 더 확인한 뒤 답해.
+3. 수학·과학 계산은 단계마다 검산하고, 계산 실수가 없는지 한 번 더 확인한 뒤 답해. 어려운 문제일수록 천천히, 빠뜨린 경우가 없는지 끝까지 따져봐.
 4. 국어 문학·비문학 해석은 교과서마다 다를 수 있음을 밝히고, 일반적인 해석 원리 위주로 설명해.
-5. ${bandLabel} ${state.grade} 수준을 벗어나는 어려운 용어는 쓰지 말고, 필요하면 쉬운 비유를 들어 설명해.
-6. 답변은 너무 길지 않게, 한 번에 소화할 수 있는 분량으로 나눠서 설명해.
+5. 어려운 용어를 꼭 써야 할 때는 그 용어를 쉬운 말로 한 번 풀어준 다음 사용해. 용어 자체를 피하려고 풀이를 대충 하지는 마.
+6. 답변은 너무 길지 않게, 한 번에 소화할 수 있는 분량으로 나눠서 설명해. 단, 풀이가 길어야만 하는 문제라면 길어도 괜찮으니 끝까지 다 설명해.
 7. 이건 AI가 생성한 답변이라는 걸 자연스럽게 인지할 수 있게 행동하고, 사람 선생님인 척하지 마.
 8. 채점이나 성적 평가는 하지 말고, 학습을 도와주는 역할에 집중해.
 9. 음성으로 읽힐 수 있으니, 수식 기호나 특수문자 나열 대신 말로 풀어서 설명해 (예: "x 제곱" 대신 "엑스의 제곱").${bandNote}
-11. 학생이 기출문제 사진을 주고 예상문제를 만들어달라고 하면, 그 문제의 유형·난이도·자주 나오는 개념을 분석해서 비슷한 새 문제를 요청한 개수만큼 만들어줘. 단, "이 문제가 실제 시험에 그대로 나온다"고 절대 단정하지 말고, "이런 유형·개념이 나올 가능성이 높다"는 식으로 정직하게 안내해.`;
+10. 학생이 기출문제 사진을 주고 예상문제를 만들어달라고 하면, 그 문제의 유형·난이도·자주 나오는 개념을 분석해서 비슷한 새 문제를 요청한 개수만큼 만들어줘. 단, "이 문제가 실제 시험에 그대로 나온다"고 절대 단정하지 말고, "이런 유형·개념이 나올 가능성이 높다"는 식으로 정직하게 안내해.`;
 }
 
 function el(sel) { return document.querySelector(sel); }
@@ -931,6 +959,14 @@ el('#previewBtn').addEventListener('click', () => {
 });
 
 el('#notifyParentBtn').addEventListener('click', sendParentNotification);
+
+// 대화 지우기: 설정은 그대로 두고 대화 내용만 비운다 (비용도 함께 초기화됨)
+el('#clearChatBtn').addEventListener('click', () => {
+  if (state.history.length && !confirm('지금까지의 대화 내용을 모두 지울까요?\n(학년·과목 등 설정은 그대로 유지돼요)')) return;
+  historyTrimNoticeShown = false;
+  resetChat(false);
+  addMessage('system', '🧹 대화를 새로 시작했어요. 편하게 물어보세요!');
+});
 
 el('#examPredictBtn').addEventListener('click', () => {
   if (!pendingImage) {
