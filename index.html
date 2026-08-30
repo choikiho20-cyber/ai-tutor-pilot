@@ -492,7 +492,7 @@
 <div class="app">
   <aside class="sidebar" id="sidebar">
     <h1><span class="logo-badge">🧑‍🏫</span> 우리 아이 과외쌤</h1>
-    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v11)</span></div>
+    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v12)</span></div>
 
     <fieldset>
       <legend>모드</legend>
@@ -565,6 +565,8 @@
       <label class="voice-label">
         <input type="checkbox" id="voiceOutToggle"> 선생님 답변을 음성으로 듣기
       </label>
+      <input type="text" id="ttsProxy" placeholder="(선택) 좋은 목소리 서버 주소" style="margin-top:8px;">
+      <div class="field-hint">비워두면 컴퓨터에 기본으로 깔린 목소리를 씁니다. 주소를 넣으면 훨씬 자연스러운 구글 목소리로 읽어줘요.</div>
     </fieldset>
 
     <details class="setup-group" id="connectGroup">
@@ -648,6 +650,7 @@ const state = {
   tone: '다정하고 다독여주는',
   apiKey: '',
   voiceOut: false,
+  ttsProxy: '',
   timetable: '',
   telegramToken: '',
   telegramChatId: '',
@@ -1064,8 +1067,9 @@ function splitSentences(text) {
 
 // 선생님이 말하는 중에 언제든 멈추거나 잠깐 쉴 수 있어야 한다
 function stopSpeaking() {
-  if (!('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
+  speakToken++;                       // 진행 중이던 구글 음성 재생을 무효화
+  stopAudio();
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
   const bar = el('#speakBar');
   if (bar) bar.classList.add('hidden');
   setPaused(false);
@@ -1081,12 +1085,13 @@ function setPaused(paused) {
 }
 
 function togglePauseSpeaking() {
-  if (!('speechSynthesis' in window)) return;
   if (speechPaused) {
-    window.speechSynthesis.resume();
+    if (currentAudio) currentAudio.play().catch(() => {});
+    if ('speechSynthesis' in window) window.speechSynthesis.resume();
     setPaused(false);
   } else {
-    window.speechSynthesis.pause();
+    if (currentAudio) currentAudio.pause();
+    if ('speechSynthesis' in window) window.speechSynthesis.pause();
     setPaused(true);
   }
 }
@@ -1102,15 +1107,66 @@ function markReading(bubbleEl, idx) {
 }
 
 // 한 문장씩 따로 읽어서, 지금 읽는 문장을 정확히 짚어줄 수 있게 한다
-function speak(text, bubbleEl) {
+// ── 좋은 목소리(구글) 재생 ────────────────────────────────────────────────
+// 중계 서버가 설정돼 있으면 구글 음성을 쓰고, 없거나 실패하면 브라우저 기본 음성으로 자동 전환한다.
+let currentAudio = null;
+let speakToken = 0;   // 새로 말하기 시작하면 이전 재생을 무효로 만드는 표시
+
+function stopAudio() {
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio.src = '';
+    currentAudio = null;
+  }
+}
+
+async function fetchGoogleAudio(sentence, lang) {
+  const res = await fetch(state.ttsProxy.replace(/\/+$/, ''), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: sentence, lang })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.audio) {
+    throw new Error(data.error || ('음성 서버 오류 ' + res.status));
+  }
+  return 'data:audio/mp3;base64,' + data.audio;
+}
+
+// 구글 음성으로 한 문장씩 순서대로 읽는다 (문장 강조·자동 스크롤은 그대로 유지)
+async function speakWithGoogle(sentences, lang, bubbleEl, myToken) {
+  const btn = el('#speakBar');
+  for (let idx = 0; idx < sentences.length; idx++) {
+    if (myToken !== speakToken) return;               // 도중에 멈췄거나 새로 시작됨
+    const spoken = cleanForSpeech(sentences[idx]);
+    if (!spoken) continue;
+
+    const src = await fetchGoogleAudio(spoken, lang);  // 실패하면 예외 → 기본 음성으로 넘어감
+    if (myToken !== speakToken) return;
+
+    await new Promise((resolve, reject) => {
+      const audio = new Audio(src);
+      currentAudio = audio;
+      audio.onplay = () => {
+        if (btn) btn.classList.remove('hidden');
+        markReading(bubbleEl, idx);
+      };
+      audio.onended = resolve;
+      audio.onerror = () => reject(new Error('소리 재생 실패'));
+      audio.play().catch(reject);
+    });
+  }
+  if (myToken === speakToken) {
+    if (btn) btn.classList.add('hidden');
+    document.querySelectorAll('.sent.reading').forEach(s => s.classList.remove('reading'));
+  }
+}
+
+// 브라우저에 원래 깔려 있는 음성으로 읽는다 (중계 서버가 없을 때 쓰는 대비책)
+function speakWithBrowser(sentences, lang, bubbleEl) {
   if (!('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
-  const lang = state.mode === 'conversation' ? 'en-US' : 'ko-KR';
   const voice = pickVoice(lang);
   const btn = el('#speakBar');
-  // 화면에 그린 순서(문단→문장)와 똑같은 순서로 읽어야 강조 위치가 맞는다
-  const sentences = [];
-  splitParagraphs(text).forEach(para => splitSentences(para).forEach(s => sentences.push(s)));
   let pending = 0;
 
   sentences.forEach((sentence, idx) => {
@@ -1137,6 +1193,26 @@ function speak(text, bubbleEl) {
     utter.onerror = done;
     window.speechSynthesis.speak(utter);
   });
+}
+
+function speak(text, bubbleEl) {
+  stopSpeaking();
+  const myToken = ++speakToken;
+  const lang = state.mode === 'conversation' ? 'en-US' : 'ko-KR';
+  // 화면에 그린 순서(문단→문장)와 똑같은 순서로 읽어야 강조 위치가 맞는다
+  const sentences = [];
+  splitParagraphs(text).forEach(para => splitSentences(para).forEach(s => sentences.push(s)));
+  if (!sentences.length) return;
+
+  if (state.ttsProxy) {
+    speakWithGoogle(sentences, lang, bubbleEl, myToken).catch(err => {
+      if (myToken !== speakToken) return;
+      console.warn('구글 음성 실패, 기본 음성으로 전환:', err.message);
+      speakWithBrowser(sentences, lang, bubbleEl);
+    });
+  } else {
+    speakWithBrowser(sentences, lang, bubbleEl);
+  }
 }
 
 function addMessage(role, text, imageDataUrl) {
@@ -1321,6 +1397,7 @@ setupChips();
 applyChipStateFromModel();
 el('#apiKey').value = state.apiKey;
 el('#voiceOutToggle').checked = state.voiceOut;
+el('#ttsProxy').value = state.ttsProxy;
 el('#timetable').value = state.timetable;
 el('#telegramToken').value = state.telegramToken;
 el('#telegramChatId').value = state.telegramChatId;
@@ -1330,6 +1407,7 @@ updateConnectGroup();
 
 el('#applyBtn').addEventListener('click', () => {
   state.apiKey = el('#apiKey').value.trim();
+  state.ttsProxy = el('#ttsProxy').value.trim();
   state.timetable = el('#timetable').value;
   state.telegramToken = el('#telegramToken').value.trim();
   state.telegramChatId = el('#telegramChatId').value.trim();
