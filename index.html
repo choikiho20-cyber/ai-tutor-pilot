@@ -583,7 +583,7 @@
 <div class="app">
   <aside class="sidebar" id="sidebar">
     <h1><span class="logo-badge">🧑‍🏫</span> 우리 아이 과외쌤</h1>
-    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v17)</span></div>
+    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v18)</span></div>
 
     <fieldset>
       <legend>모드</legend>
@@ -655,6 +655,9 @@
       <legend>음성</legend>
       <label class="voice-label">
         <input type="checkbox" id="voiceOutToggle"> 선생님 답변을 음성으로 듣기
+      </label>
+      <label class="voice-label" style="margin-top:6px;">
+        <input type="checkbox" id="followScrollToggle"> 읽는 문장 따라 화면 내려가기
       </label>
       <input type="text" id="ttsProxy" placeholder="(선택) 좋은 목소리 서버 주소" style="margin-top:8px;">
       <div class="field-hint">비워두면 컴퓨터에 기본으로 깔린 목소리를 씁니다. 클라우드플레어에서 만든 중계 서버 주소를 넣으면 훨씬 자연스러운 구글 목소리로 읽어줘요.</div>
@@ -751,6 +754,7 @@ const state = {
   tone: '다정하고 다독여주는',
   apiKey: '',
   voiceOut: false,
+  followScroll: false,
   ttsProxy: '',
   voiceName: 'Leda',
   timetable: '',
@@ -1088,11 +1092,25 @@ function cleanForSpeech(text) {
     // 이모지·기호 제거
     .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{FE00}-\u{FE0F}\u{200D}]/gu, ' ');
 
-  if (state.mode !== 'conversation') {
+  // 가운뎃점(·)은 그냥 두면 이상하게 읽히므로 쉼표로 바꿔 자연스럽게 끊어 읽게 한다
+  out = out.replace(/\s*·\s*/g, ', ').replace(/\s*~\s*/g, ' 에서 ');
+
+  // 수식 변환은 '진짜 수식이 있을 때만' 적용한다.
+  // 일반 문장에까지 적용하면 괄호를 "괄호"라고 읽는 등 오히려 어색해진다.
+  if (state.mode !== 'conversation' && looksLikeMath(out)) {
     out = mathToKoreanSpeech(out);
   }
 
   return out.replace(/[ \t]{2,}/g, ' ').replace(/\n{2,}/g, '\n').trim();
+}
+
+// 수식이 들어있는 문장인지 판단
+function looksLikeMath(text) {
+  return /[²³√≤≥≠±×÷]/.test(text)
+      || /\^\s*\d/.test(text)
+      || /\\(frac|sqrt|times|div)/.test(text)
+      || /[0-9a-zA-Z)\]]\s*=\s*[0-9a-zA-Z(\[-]/.test(text)
+      || /[0-9a-zA-Z]\s*[+]\s*[0-9a-zA-Z]/.test(text);
 }
 
 // 화면에는 수식을 수식답게 보여주되(x² + ax + b),
@@ -1241,7 +1259,8 @@ function markReading(bubbleEl, idx) {
   const target = bubbleEl.querySelector('.sent[data-idx="' + idx + '"]');
   if (!target) return;
   target.classList.add('reading');
-  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  // 따라 내려가기를 켠 경우에만 화면을 움직인다 (끄면 강조만 되고 화면은 그대로)
+  if (state.followScroll) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 // 한 문장씩 따로 읽어서, 지금 읽는 문장을 정확히 짚어줄 수 있게 한다
@@ -1274,28 +1293,42 @@ async function fetchGoogleAudio(sentence, lang) {
   return 'data:audio/mp3;base64,' + data.audio;
 }
 
-// 구글 음성으로 한 문장씩 순서대로 읽는다 (문장 강조·자동 스크롤은 그대로 유지)
+// 구글 음성으로 한 문장씩 순서대로 읽는다.
+// 다음 문장 소리를 미리 받아두어야 문장 사이가 끊기지 않고 자연스럽게 이어진다.
 async function speakWithGoogle(sentences, lang, bubbleEl, myToken) {
   const btn = el('#speakBar');
-  for (let idx = 0; idx < sentences.length; idx++) {
-    if (myToken !== speakToken) return;               // 도중에 멈췄거나 새로 시작됨
-    const spoken = cleanForSpeech(sentences[idx]);
-    if (!spoken) continue;
+  const items = sentences
+    .map((s, idx) => ({ idx, spoken: cleanForSpeech(s) }))
+    .filter(it => it.spoken);
+  if (!items.length) return;
 
-    const src = await fetchGoogleAudio(spoken, lang);  // 실패하면 예외 → 기본 음성으로 넘어감
+  let nextFetch = fetchGoogleAudio(items[0].spoken, lang);
+
+  for (let i = 0; i < items.length; i++) {
     if (myToken !== speakToken) return;
+    const src = await nextFetch;
+    if (myToken !== speakToken) return;
+
+    // 지금 문장을 재생하는 동안 다음 문장 소리를 미리 받아둔다
+    nextFetch = (i + 1 < items.length)
+      ? fetchGoogleAudio(items[i + 1].spoken, lang).catch(() => null)
+      : null;
 
     await new Promise((resolve, reject) => {
       const audio = new Audio(src);
       currentAudio = audio;
       audio.onplay = () => {
         if (btn) btn.classList.remove('hidden');
-        markReading(bubbleEl, idx);
+        markReading(bubbleEl, items[i].idx);
       };
       audio.onended = resolve;
       audio.onerror = () => reject(new Error('소리 재생 실패'));
       audio.play().catch(reject);
     });
+
+    if (nextFetch === null && i + 1 < items.length) {
+      throw new Error('다음 문장 소리를 받지 못했어요');
+    }
   }
   if (myToken === speakToken) {
     if (btn) btn.classList.add('hidden');
@@ -1575,6 +1608,7 @@ setupChips();
 applyChipStateFromModel();
 el('#apiKey').value = state.apiKey;
 el('#voiceOutToggle').checked = state.voiceOut;
+el('#followScrollToggle').checked = state.followScroll;
 el('#ttsProxy').value = state.ttsProxy;
 el('#timetable').value = state.timetable;
 el('#telegramToken').value = state.telegramToken;
@@ -1658,6 +1692,11 @@ el('#examPredictBtn').addEventListener('click', () => {
 
 // 주소를 입력하는 즉시 목소리 목록이 나타나게
 el('#ttsProxy').addEventListener('input', updateVoicePicker);
+
+el('#followScrollToggle').addEventListener('change', (e) => {
+  state.followScroll = e.target.checked;
+  saveSettings();
+});
 
 el('#voiceOutToggle').addEventListener('change', (e) => {
   state.voiceOut = e.target.checked;
