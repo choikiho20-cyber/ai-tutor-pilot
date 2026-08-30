@@ -463,7 +463,7 @@
 <div class="app">
   <aside class="sidebar" id="sidebar">
     <h1><span class="logo-badge">🧑‍🏫</span> 우리 아이 과외쌤</h1>
-    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v7)</span></div>
+    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v8)</span></div>
 
     <fieldset>
       <legend>모드</legend>
@@ -489,14 +489,16 @@
     </fieldset>
 
     <fieldset id="subjectsField">
-      <legend>중점 과목 (여러 개 선택 가능)</legend>
+      <legend>특히 신경 써줄 과목</legend>
       <div class="chip-group" data-group="subjects" data-multi="true">
         <div class="chip active" data-value="수학">수학</div>
         <div class="chip active" data-value="영어">영어</div>
         <div class="chip" data-value="국어">국어</div>
         <div class="chip" data-value="과학">과학</div>
         <div class="chip" data-value="사회">사회</div>
+        <div class="chip" data-value="한국사">한국사</div>
       </div>
+      <div class="field-hint">여기서 고른 과목은 더 꼼꼼히 봐줘요. <strong>고르지 않아도 모든 과목·모든 질문에 다 답해줍니다.</strong></div>
     </fieldset>
 
     <fieldset id="timetableField">
@@ -583,7 +585,7 @@
     <div class="composer">
       <input type="file" id="imageInput" accept="image/*" capture="environment" class="hidden">
       <button id="cameraBtn" class="mic-btn" type="button" title="문제 사진 첨부">📷</button>
-      <textarea id="input" placeholder="궁금한 걸 물어보세요! 예: 일차방정식 풀이 순서를 다시 설명해줘" rows="1"></textarea>
+      <textarea id="input" placeholder="어떤 과목이든 물어보세요! 예: 무신정변이 왜 일어났어?" rows="1"></textarea>
       <button id="micBtn" class="mic-btn" type="button" title="음성으로 말하기">🎤</button>
       <button id="sendBtn">보내기</button>
     </div>
@@ -688,7 +690,8 @@ function buildSystemPrompt() {
     : band === 'high'
       ? '\n11. 고등학생에게는 심화 개념과 공식을 그대로 써도 되고, 대학 과정 개념이 필요하면 짧게 소개해도 좋아. 다만 입시·내신에서 요구하는 정확한 서술 방식과 근거 제시를 특히 신경 써.'
       : '';
-  return `너는 한국 ${bandLabel} ${state.grade} 학생을 가르치는 전과목 과외선생님이야. 특히 ${subjectList} 과목을 중점적으로 봐줘.${timetableNote}
+  return `너는 한국 ${bandLabel} ${state.grade} 학생을 가르치는 전과목 과외선생님이야.
+학생이 ${subjectList} 과목을 특히 신경 써달라고 했으니 그 과목은 더 꼼꼼히 봐줘. 다만 이건 우선순위일 뿐이고, 학생이 어떤 과목(한국사·도덕·기술가정·음악·미술·체육 등 무엇이든)을 물어도 똑같이 성심껏 답해야 한다. "그 과목은 제 담당이 아니에요" 같은 말은 절대 하지 마라.${timetableNote}
 
 말투: ${state.tone} 말투를 항상 유지해. 존댓말을 쓰되 어렵지 않게.
 
@@ -761,7 +764,7 @@ function updateModeUI() {
   el('#previewBtn').classList.toggle('hidden', isConversation);
   el('#input').placeholder = isConversation
     ? 'Try saying something in English! 예: What did you do at school today?'
-    : '궁금한 걸 물어보세요! 예: 일차방정식 풀이 순서를 다시 설명해줘';
+    : '어떤 과목이든 물어보세요! 예: 무신정변이 왜 일어났어?';
 
   const isElementary = gradeBand(state.grade) === 'elementary';
   el('#guardianBanner').classList.toggle('hidden', !isElementary);
@@ -955,7 +958,8 @@ function resetChat(withGreeting) {
   el('#messages').innerHTML = '';
   if (withGreeting) {
     const desc = state.mode === 'conversation' ? '영어 회화 연습' : (state.subjects.join(', ') || '전과목');
-    addMessage('system', `설정 완료! ${state.grade} · ${desc} · "${state.tone}" 말투로 답할게요.`);
+    const allSubjectsNote = state.mode === 'conversation' ? '' : ' 어떤 과목이든 편하게 물어보세요!';
+    addMessage('system', `설정 완료! ${state.grade} · ${desc} · "${state.tone}" 말투로 답할게요.${allSubjectsNote}`);
   }
   renderMeta();
   updateModeUI();
@@ -1400,7 +1404,7 @@ el('#input').addEventListener('input', function () {
 });
 
 if (state.apiKey) {
-  addMessage('system', `설정 불러옴: ${state.grade} · ${state.subjects.join(', ')} · "${state.tone}" 말투. 바로 질문해보세요!`);
+  addMessage('system', `설정 불러옴: ${state.grade} · ${state.subjects.join(', ') || '전과목'} · "${state.tone}" 말투. 어떤 과목이든 편하게 물어보세요!`);
 } else {
   addMessage('system', '왼쪽에서 학년·과목·말투를 정하고, API 키를 입력한 뒤 "설정 적용"을 눌러주세요.');
 }
