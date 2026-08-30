@@ -1570,7 +1570,7 @@ el('#telegramChatId').value = state.telegramChatId;
 renderMeta();
 updateModeUI();
 updateConnectGroup();
-updateVoicePicker();
+// updateVoicePicker() 는 목소리 목록이 정의된 뒤라야 하므로 이 파일 맨 아래에서 부른다
 
 el('#applyBtn').addEventListener('click', () => {
   state.apiKey = el('#apiKey').value.trim();
@@ -1998,6 +1998,9 @@ if (state.apiKey) {
 } else {
   addMessage('system', '왼쪽에서 학년·과목·말투를 정하고, API 키를 입력한 뒤 "설정 적용"을 눌러주세요.');
 }
+
+// 목소리 목록은 정의가 모두 끝난 이 시점에 그린다
+updateVoicePicker();
 </script>
 </body>
 </html>
