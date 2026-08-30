@@ -446,7 +446,7 @@
 <div class="app">
   <aside class="sidebar" id="sidebar">
     <h1><span class="logo-badge">🧑‍🏫</span> 우리 아이 과외쌤</h1>
-    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v5)</span></div>
+    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v6)</span></div>
 
     <fieldset>
       <legend>모드</legend>
@@ -640,9 +640,9 @@ function buildSystemPrompt() {
 
   if (state.mode === 'conversation') {
     const bandNote = band === 'elementary'
-      ? '\n8. 초등학생에게 말할 때는 아주 쉬운 단어와 짧은 문장을 쓰고, 문법 지적은 거의 하지 말고 재미있게 대화하는 데 집중해.'
+      ? '\n9. 초등학생에게 말할 때는 아주 쉬운 단어와 짧은 문장을 쓰고, 문법 지적은 거의 하지 말고 재미있게 대화하는 데 집중해.'
       : band === 'high'
-        ? '\n8. 고등학생에게는 시험·입시에 자주 나오는 표현이나 조금 더 긴 문장도 써도 돼.'
+        ? '\n9. 고등학생에게는 시험·입시에 자주 나오는 표현이나 조금 더 긴 문장도 써도 돼.'
         : '';
     return `너는 한국 ${bandLabel} ${state.grade} 학생과 영어 회화를 연습시켜주는 원어민 회화 파트너야.
 
@@ -654,7 +654,8 @@ function buildSystemPrompt() {
 5. 말투: ${state.tone} 느낌을 유지해.
 6. 응답은 2~4문장 정도로 짧게, 실제 대화처럼 유지해.
 7. 이건 AI라는 걸 자연스럽게 인지할 수 있게 행동하고, 사람인 척하지 마.
-   학생이 어려운 질문(문법 원리, 어려운 단어 뜻, 학년을 넘는 표현)을 하면 회피하지 말고 정확하게 알려주되, 설명만 학생 눈높이에 맞춰서 해줘.${bandNote}`;
+   학생이 어려운 질문(문법 원리, 어려운 단어 뜻, 학년을 넘는 표현)을 하면 회피하지 말고 정확하게 알려주되, 설명만 학생 눈높이에 맞춰서 해줘.
+8. 답변은 음성으로도 읽히니 마크다운 기호(**, ##, - 목록)나 이모지를 쓰지 말고 평범한 문장으로만 써라.${bandNote}`;
   }
 
   const subjectList = state.subjects.length ? state.subjects.join(', ') : '전과목';
@@ -663,9 +664,9 @@ function buildSystemPrompt() {
     ? `\n\n학생 시간표: 오늘(${todayLabel}요일)은 ${todaySubjects.join(', ') || '정보 없음'}, 내일(${tomorrowLabel}요일)은 ${tomorrowSubjects.join(', ') || '정보 없음'}을 배워. 학생이 별다른 질문 없이 인사만 하거나 대화를 시작하면, 먼저 오늘 배운 과목 복습이나 내일 배울 과목 예습을 자연스럽게 제안해줘.`
     : '';
   const bandNote = band === 'elementary'
-    ? '\n- 초등학생에게 설명할 때는 아주 쉬운 단어와 짧은 문장을 쓰고, 숫자나 그림으로 비유하듯 풀어줘. 정답을 맞히는 것보다 "아 이거구나" 하고 이해하는 느낌을 주는 게 더 중요해.'
+    ? '\n11. 초등학생에게 설명할 때는 아주 쉬운 단어와 짧은 문장을 쓰고, 숫자나 그림으로 비유하듯 풀어줘. 정답을 맞히는 것보다 "아 이거구나" 하고 이해하는 느낌을 주는 게 더 중요해.'
     : band === 'high'
-      ? '\n- 고등학생에게는 심화 개념과 공식을 그대로 써도 되고, 대학 과정 개념이 필요하면 짧게 소개해도 좋아. 다만 입시·내신에서 요구하는 정확한 서술 방식과 근거 제시를 특히 신경 써.'
+      ? '\n11. 고등학생에게는 심화 개념과 공식을 그대로 써도 되고, 대학 과정 개념이 필요하면 짧게 소개해도 좋아. 다만 입시·내신에서 요구하는 정확한 서술 방식과 근거 제시를 특히 신경 써.'
       : '';
   return `너는 한국 ${bandLabel} ${state.grade} 학생을 가르치는 전과목 과외선생님이야. 특히 ${subjectList} 과목을 중점적으로 봐줘.${timetableNote}
 
@@ -692,8 +693,16 @@ function buildSystemPrompt() {
 6. 답변은 너무 길지 않게, 한 번에 소화할 수 있는 분량으로 나눠서 설명해. 단, 풀이가 길어야만 하는 문제라면 길어도 괜찮으니 끝까지 다 설명해.
 7. 이건 AI가 생성한 답변이라는 걸 자연스럽게 인지할 수 있게 행동하고, 사람 선생님인 척하지 마.
 8. 채점이나 성적 평가는 하지 말고, 학습을 도와주는 역할에 집중해.
-9. 음성으로 읽힐 수 있으니, 수식 기호나 특수문자 나열 대신 말로 풀어서 설명해 (예: "x 제곱" 대신 "엑스의 제곱").${bandNote}
-10. 학생이 기출문제 사진을 주고 예상문제를 만들어달라고 하면, 그 문제의 유형·난이도·자주 나오는 개념을 분석해서 비슷한 새 문제를 요청한 개수만큼 만들어줘. 단, "이 문제가 실제 시험에 그대로 나온다"고 절대 단정하지 말고, "이런 유형·개념이 나올 가능성이 높다"는 식으로 정직하게 안내해.`;
+9. 【표기 규칙 — 반드시 지킬 것】 이 답변은 화면에 그대로 표시되고 음성으로도 읽힌다. 그러니 다음을 절대 쓰지 마라:
+   - 마크다운 기호: **굵게**, ## 제목, - 목록, \`코드\`, > 인용 (별표·샵 기호가 그대로 읽혀버린다)
+   - LaTeX 수식 기호: $...$, \\frac, \\times 같은 것 (달러 기호가 그대로 읽혀버린다)
+   - 이모지 (읽어주는 기계가 "웃는 얼굴"이라고 소리 내어 읽어버린다)
+   대신 이렇게 써라:
+   - 강조가 필요하면 그냥 문장으로 강조해라 ("여기가 핵심이에요")
+   - 단계를 나눌 때는 "첫째,", "둘째," 또는 "1단계:" 처럼 말로 써라
+   - 수식은 말로 풀어써라. x²+ax+b 는 "엑스 제곱 더하기 에이 엑스 더하기 비" 처럼, x=5 는 "엑스는 5" 처럼.
+   - 꼭 식을 보여줘야 하면 특수기호 없이 평범한 글자로만 써라 (예: x^2 + ax + b 대신 "x제곱 + ax + b").${bandNote}
+12. 학생이 기출문제 사진을 주고 예상문제를 만들어달라고 하면, 그 문제의 유형·난이도·자주 나오는 개념을 분석해서 비슷한 새 문제를 요청한 개수만큼 만들어줘. 단, "이 문제가 실제 시험에 그대로 나온다"고 절대 단정하지 말고, "이런 유형·개념이 나올 가능성이 높다"는 식으로 정직하게 안내해.`;
 }
 
 function el(sel) { return document.querySelector(sel); }
@@ -772,11 +781,81 @@ async function sendParentNotification() {
   }
 }
 
+// 음성으로 읽기 전에, 눈으로만 의미 있는 기호(마크다운·수식·이모지)를 걷어낸다.
+// 안 그러면 "**힌트**"를 "별표 별표 힌트"로, "$pq=0$"을 "달러 사인"으로 읽어버린다.
+function cleanForSpeech(text) {
+  let out = text
+    .replace(/\$\$([\s\S]*?)\$\$/g, ' $1 ')
+    .replace(/\$([^$\n]*?)\$/g, ' $1 ')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^#{1,6}\s*/gm, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*\n]+)\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s*>\s?/gm, '')
+    .replace(/^\s*[-=]{3,}\s*$/gm, ' ')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    // 이모지·기호 제거
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{FE00}-\u{FE0F}\u{200D}]/gu, ' ');
+
+  if (state.mode !== 'conversation') {
+    // 수학 기호는 한국어로 풀어서 읽어준다
+    out = out
+      .replace(/\\times|×/g, ' 곱하기 ')
+      .replace(/\\div|÷/g, ' 나누기 ')
+      .replace(/\\leq|≤/g, ' 이하 ')
+      .replace(/\\geq|≥/g, ' 이상 ')
+      .replace(/\\neq|≠/g, ' 는 같지 않다 ')
+      .replace(/\\pm|±/g, ' 플러스 마이너스 ')
+      .replace(/\\sqrt/g, ' 루트 ')
+      .replace(/\\frac/g, ' 분수 ')
+      .replace(/\^\s*2|²/g, ' 제곱 ')
+      .replace(/\^\s*3|³/g, ' 세제곱 ')
+      .replace(/\\[a-zA-Z]+/g, ' ')
+      .replace(/[{}]/g, ' ')
+      .replace(/\s*=\s*/g, ' 는 ')
+      .replace(/\s*\+\s*/g, ' 더하기 ');
+  }
+
+  return out.replace(/[ \t]{2,}/g, ' ').replace(/\n{2,}/g, '\n').trim();
+}
+
+// 기계음 느낌을 줄이기 위해, 기기에 설치된 목소리 중 자연스러운 것을 골라 쓴다
+let cachedVoice = null;
+let cachedVoiceLang = null;
+function pickVoice(lang) {
+  if (cachedVoice && cachedVoiceLang === lang) return cachedVoice;
+  const voices = window.speechSynthesis.getVoices() || [];
+  const sameLang = voices.filter(v => v.lang && v.lang.replace('_', '-').toLowerCase().startsWith(lang.slice(0, 2)));
+  if (!sameLang.length) return null;
+  // 최신 자연스러운 음성 엔진 이름을 우선순위로 둔다
+  const preferred = ['neural', 'natural', 'online', 'google', 'siri', 'premium', 'enhanced'];
+  for (const keyword of preferred) {
+    const found = sameLang.find(v => v.name.toLowerCase().includes(keyword));
+    if (found) { cachedVoice = found; cachedVoiceLang = lang; return found; }
+  }
+  cachedVoice = sameLang[0];
+  cachedVoiceLang = lang;
+  return cachedVoice;
+}
+if ('speechSynthesis' in window) {
+  window.speechSynthesis.onvoiceschanged = () => { cachedVoice = null; cachedVoiceLang = null; };
+}
+
 function speak(text) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
-  const utter = new SpeechSynthesisUtterance(text);
-  utter.lang = state.mode === 'conversation' ? 'en-US' : 'ko-KR';
+  const spoken = cleanForSpeech(text);
+  if (!spoken) return;
+  const lang = state.mode === 'conversation' ? 'en-US' : 'ko-KR';
+  const utter = new SpeechSynthesisUtterance(spoken);
+  utter.lang = lang;
+  const voice = pickVoice(lang);
+  if (voice) utter.voice = voice;
+  utter.rate = 1.02;
+  utter.pitch = 1.05;
   window.speechSynthesis.speak(utter);
 }
 
