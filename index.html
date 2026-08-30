@@ -322,6 +322,23 @@
     display: block;
     margin-bottom: 6px;
   }
+  .speak-bar {
+    padding: 0 18px 8px;
+  }
+  .speak-bar button {
+    border: 1px solid #d97706;
+    background: #fef3c7;
+    color: #92400e;
+    border-radius: 999px;
+    padding: 7px 16px;
+    font-size: 13px;
+    font-family: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter 0.15s ease, transform 0.1s ease;
+  }
+  .speak-bar button:hover { filter: brightness(0.96); }
+  .speak-bar button:active { transform: scale(0.96); }
   .quick-actions {
     display: flex;
     gap: 8px;
@@ -446,7 +463,7 @@
 <div class="app">
   <aside class="sidebar" id="sidebar">
     <h1><span class="logo-badge">🧑‍🏫</span> 우리 아이 과외쌤</h1>
-    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v6)</span></div>
+    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v7)</span></div>
 
     <fieldset>
       <legend>모드</legend>
@@ -544,6 +561,9 @@
     <div class="guardian-banner hidden" id="guardianBanner">👨‍👩‍👧 저학년은 보호자와 함께 사용하는 걸 권장해요</div>
     <div class="messages" id="messages"></div>
     <div class="typing" id="typingIndicator" style="display:none;">선생님이 답변을 작성 중이에요...</div>
+    <div class="speak-bar hidden" id="stopSpeakBtn">
+      <button type="button">⏹ 그만 듣기</button>
+    </div>
     <div class="quick-actions" id="quickActions">
       <button class="quick-btn" id="reviewBtn" type="button">📘 오늘 배운 거 복습하기</button>
       <button class="quick-btn" id="previewBtn" type="button">📖 내일 배울 거 예습하기</button>
@@ -693,15 +713,19 @@ function buildSystemPrompt() {
 6. 답변은 너무 길지 않게, 한 번에 소화할 수 있는 분량으로 나눠서 설명해. 단, 풀이가 길어야만 하는 문제라면 길어도 괜찮으니 끝까지 다 설명해.
 7. 이건 AI가 생성한 답변이라는 걸 자연스럽게 인지할 수 있게 행동하고, 사람 선생님인 척하지 마.
 8. 채점이나 성적 평가는 하지 말고, 학습을 도와주는 역할에 집중해.
-9. 【표기 규칙 — 반드시 지킬 것】 이 답변은 화면에 그대로 표시되고 음성으로도 읽힌다. 그러니 다음을 절대 쓰지 마라:
-   - 마크다운 기호: **굵게**, ## 제목, - 목록, \`코드\`, > 인용 (별표·샵 기호가 그대로 읽혀버린다)
-   - LaTeX 수식 기호: $...$, \\frac, \\times 같은 것 (달러 기호가 그대로 읽혀버린다)
-   - 이모지 (읽어주는 기계가 "웃는 얼굴"이라고 소리 내어 읽어버린다)
-   대신 이렇게 써라:
-   - 강조가 필요하면 그냥 문장으로 강조해라 ("여기가 핵심이에요")
-   - 단계를 나눌 때는 "첫째,", "둘째," 또는 "1단계:" 처럼 말로 써라
-   - 수식은 말로 풀어써라. x²+ax+b 는 "엑스 제곱 더하기 에이 엑스 더하기 비" 처럼, x=5 는 "엑스는 5" 처럼.
-   - 꼭 식을 보여줘야 하면 특수기호 없이 평범한 글자로만 써라 (예: x^2 + ax + b 대신 "x제곱 + ax + b").${bandNote}
+9. 【표기 규칙 — 반드시 지킬 것】 이 답변은 화면에 그대로 표시되고, 동시에 기계가 소리 내어 읽어준다.
+   ■ 쓰지 말 것 (기호 이름이 그대로 소리로 읽혀버린다):
+   - 마크다운 기호: **굵게**, ## 제목, - 목록, \`코드\`, > 인용
+   - LaTeX: $...$, \\frac{}{}, \\times, \\sqrt 같은 명령어
+   - 이모지
+   ■ 수식은 반드시 수식답게 써라 (한글로 풀어쓰지 마라):
+   - 올바른 예: x² + ax + b = 0, x(x + a), (x + 2)(x - 3), y ≤ 10, √2
+   - 틀린 예: "엑스 제곱 더하기 에이엑스" (이렇게 한글로 풀어쓰면 수학이 아니라서 학생이 오히려 헷갈린다)
+   - 제곱은 ² ³ 같은 위첨자나 x^2 형태로 쓰면 된다. 분수는 3/4 처럼 슬래시로 써라.
+   ■ 강조나 구조는 기호 대신 말로 표현해라:
+   - 강조가 필요하면 문장으로 강조해라 ("여기가 핵심이에요")
+   - 단계는 "첫째,", "둘째," 또는 "1단계:" 처럼 말로 써라
+   (수식을 소리로 읽는 변환은 프로그램이 알아서 처리하니, 너는 화면에 보기 좋은 정확한 수식만 쓰면 된다.)${bandNote}
 12. 학생이 기출문제 사진을 주고 예상문제를 만들어달라고 하면, 그 문제의 유형·난이도·자주 나오는 개념을 분석해서 비슷한 새 문제를 요청한 개수만큼 만들어줘. 단, "이 문제가 실제 시험에 그대로 나온다"고 절대 단정하지 말고, "이런 유형·개념이 나올 가능성이 높다"는 식으로 정직하게 안내해.`;
 }
 
@@ -801,25 +825,60 @@ function cleanForSpeech(text) {
     .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{FE00}-\u{FE0F}\u{200D}]/gu, ' ');
 
   if (state.mode !== 'conversation') {
-    // 수학 기호는 한국어로 풀어서 읽어준다
-    out = out
-      .replace(/\\times|×/g, ' 곱하기 ')
-      .replace(/\\div|÷/g, ' 나누기 ')
-      .replace(/\\leq|≤/g, ' 이하 ')
-      .replace(/\\geq|≥/g, ' 이상 ')
-      .replace(/\\neq|≠/g, ' 는 같지 않다 ')
-      .replace(/\\pm|±/g, ' 플러스 마이너스 ')
-      .replace(/\\sqrt/g, ' 루트 ')
-      .replace(/\\frac/g, ' 분수 ')
-      .replace(/\^\s*2|²/g, ' 제곱 ')
-      .replace(/\^\s*3|³/g, ' 세제곱 ')
-      .replace(/\\[a-zA-Z]+/g, ' ')
-      .replace(/[{}]/g, ' ')
-      .replace(/\s*=\s*/g, ' 는 ')
-      .replace(/\s*\+\s*/g, ' 더하기 ');
+    out = mathToKoreanSpeech(out);
   }
 
   return out.replace(/[ \t]{2,}/g, ' ').replace(/\n{2,}/g, '\n').trim();
+}
+
+// 화면에는 수식을 수식답게 보여주되(x² + ax + b),
+// 소리로 읽을 때만 한국 수학 시간에 말하는 방식으로 바꾼다("엑스 제곱 더하기 에이엑스 더하기 비").
+const MATH_LETTER_SOUND = {
+  a: '에이', b: '비', c: '씨', d: '디', e: '이', f: '에프', g: '지', h: '에이치',
+  i: '아이', j: '제이', k: '케이', l: '엘', m: '엠', n: '엔', p: '피', q: '큐',
+  r: '알', s: '에스', t: '티', u: '유', v: '브이', w: '더블유', x: '엑스', y: '와이', z: '지'
+};
+
+function mathToKoreanSpeech(text) {
+  let out = text
+    // 남아있을 수 있는 LaTeX 잔재 정리
+    .replace(/\\sqrt\s*\{?([^}\s]*)\}?/g, ' 루트 $1 ')
+    .replace(/\\frac\s*\{([^}]*)\}\s*\{([^}]*)\}/g, ' $2 분의 $1 ')
+    .replace(/\\[a-zA-Z]+/g, ' ')
+    .replace(/[{}]/g, ' ')
+    // 거듭제곱은 일단 ^2 형태로만 통일해 둔다 (한글 변환은 연산자 처리 뒤에)
+    .replace(/²/g, '^2').replace(/³/g, '^3').replace(/⁴/g, '^4')
+    // 비교 기호
+    .replace(/≤|<=/g, ' 보다 작거나 같고 ')
+    .replace(/≥|>=/g, ' 보다 크거나 같고 ')
+    .replace(/≠|!=/g, ' 은 같지 않고 ')
+    .replace(/±/g, ' 플러스 마이너스 ')
+    .replace(/√/g, ' 루트 ')
+    // 연산 기호: 수식 문맥(숫자·문자·괄호 사이)에서만 바꾼다
+    .replace(/([0-9a-zA-Z)\]])\s*×\s*([0-9a-zA-Z(\[])/g, '$1 곱하기 $2')
+    .replace(/([0-9a-zA-Z)\]])\s*÷\s*([0-9a-zA-Z(\[])/g, '$1 나누기 $2')
+    .replace(/([0-9a-zA-Z)\]])\s*\+\s*([0-9a-zA-Z(\[])/g, '$1 더하기 $2')
+    .replace(/([0-9a-zA-Z)\]])\s+-\s+([0-9a-zA-Z(\[])/g, '$1 빼기 $2')
+    .replace(/([0-9a-zA-Z)\]])\s*\/\s*([0-9a-zA-Z(\[])/g, '$2 분의 $1')
+    .replace(/([0-9a-zA-Z)\]])\s*=\s*/g, '$1 는 ')
+    .replace(/([0-9a-zA-Z)\]])\s*<\s*([0-9a-zA-Z(\[])/g, '$1 보다 작고 $2')
+    .replace(/([0-9a-zA-Z)\]])\s*>\s*([0-9a-zA-Z(\[])/g, '$1 보다 크고 $2')
+    // 이제 거듭제곱을 한글로
+    .replace(/\^\s*2\b/g, ' 제곱 ')
+    .replace(/\^\s*3\b/g, ' 세제곱 ')
+    .replace(/\^\s*(\d+)/g, ' 의 $1 제곱 ')
+    // 괄호는 "괄호"라고 읽어주고 닫을 때는 쉼표로 끊어 읽는다
+    .replace(/\(/g, ' 괄호 ')
+    .replace(/\)/g, ', ');
+
+  // 홀로 쓰인 알파벳 한 글자는 한글 발음으로 (x → 엑스). 영어 단어는 건드리지 않는다.
+  out = out.replace(/\b([a-zA-Z])\b/g, (m, ch) => MATH_LETTER_SOUND[ch.toLowerCase()] || m);
+  // 붙어 있는 곱셈 표기도 읽어준다 (ax → 에이엑스, 2x → 2 엑스)
+  out = out.replace(/\b([a-z])([a-z])\b/g, (m, c1, c2) =>
+    (MATH_LETTER_SOUND[c1] || c1) + (MATH_LETTER_SOUND[c2] || c2));
+  out = out.replace(/(\d)([a-zA-Z])\b/g, (m, d, ch) => d + ' ' + (MATH_LETTER_SOUND[ch.toLowerCase()] || ch));
+
+  return out;
 }
 
 // 기계음 느낌을 줄이기 위해, 기기에 설치된 목소리 중 자연스러운 것을 골라 쓴다
@@ -844,6 +903,14 @@ if ('speechSynthesis' in window) {
   window.speechSynthesis.onvoiceschanged = () => { cachedVoice = null; cachedVoiceLang = null; };
 }
 
+// 선생님이 말하는 중에 언제든 멈출 수 있어야 한다
+function stopSpeaking() {
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const btn = el('#stopSpeakBtn');
+  if (btn) btn.classList.add('hidden');
+}
+
 function speak(text) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
@@ -856,6 +923,10 @@ function speak(text) {
   if (voice) utter.voice = voice;
   utter.rate = 1.02;
   utter.pitch = 1.05;
+  const btn = el('#stopSpeakBtn');
+  utter.onstart = () => { if (btn) btn.classList.remove('hidden'); };
+  utter.onend = () => { if (btn) btn.classList.add('hidden'); };
+  utter.onerror = () => { if (btn) btn.classList.add('hidden'); };
   window.speechSynthesis.speak(utter);
 }
 
@@ -901,6 +972,7 @@ async function sendMessage() {
     return;
   }
 
+  stopSpeaking(); // 새 질문을 보내면 이전 답변 읽기는 멈춘다
   const userText = text || '이 사진 속 문제를 풀이해줘.';
   addMessage('user', text, pendingImage?.dataUrl);
 
@@ -1052,9 +1124,13 @@ el('#previewBtn').addEventListener('click', () => {
 
 el('#notifyParentBtn').addEventListener('click', sendParentNotification);
 
+// 선생님 말 끊기
+el('#stopSpeakBtn').addEventListener('click', stopSpeaking);
+
 // 대화 지우기: 설정은 그대로 두고 대화 내용만 비운다 (비용도 함께 초기화됨)
 el('#clearChatBtn').addEventListener('click', () => {
   if (state.history.length && !confirm('지금까지의 대화 내용을 모두 지울까요?\n(학년·과목 등 설정은 그대로 유지돼요)')) return;
+  stopSpeaking();
   historyTrimNoticeShown = false;
   resetChat(false);
   addMessage('system', '🧹 대화를 새로 시작했어요. 편하게 물어보세요!');
@@ -1238,33 +1314,73 @@ document.addEventListener('paste', (e) => {
 });
 
 // 음성 입력 (마이크): 브라우저 내장 Web Speech API 사용, 별도 서버 연동 없음
+// 한 번 누르면 계속 듣고, 다시 누르면 멈춘다 (짧게 끊겨서 말이 잘리는 문제 방지)
 const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
 if (SpeechRecognitionCtor) {
   const recognition = new SpeechRecognitionCtor();
-  recognition.interimResults = false;
+  recognition.continuous = true;      // 잠깐 쉬어도 끊기지 않게
+  recognition.interimResults = true;  // 말하는 중에도 화면에 바로 보이게
+  recognition.maxAlternatives = 3;    // 인식 후보를 여러 개 받아 정확도 향상
+
   let listening = false;
+  let userStopped = false;
+  let baseText = '';   // 마이크 켜기 전에 이미 입력창에 있던 글
+  let finalText = '';  // 이번에 말해서 확정된 글
+
+  function startListening() {
+    stopSpeaking(); // 선생님이 말하는 중이면 멈춰야 마이크가 그 소리를 안 듣는다
+    userStopped = false;
+    baseText = el('#input').value.trim();
+    finalText = '';
+    recognition.lang = state.mode === 'conversation' ? 'en-US' : 'ko-KR';
+    try { recognition.start(); } catch (e) { /* 이미 켜져있으면 무시 */ }
+  }
+
+  function stopListening() {
+    userStopped = true;
+    try { recognition.stop(); } catch (e) {}
+  }
 
   el('#micBtn').addEventListener('click', () => {
-    if (listening) { recognition.stop(); return; }
-    recognition.lang = state.mode === 'conversation' ? 'en-US' : 'ko-KR';
-    recognition.start();
+    if (listening) stopListening(); else startListening();
   });
 
   recognition.addEventListener('start', () => {
     listening = true;
     el('#micBtn').classList.add('recording');
+    el('#micBtn').title = '다 말했으면 눌러서 멈추기';
+    el('#input').placeholder = '🎤 듣고 있어요... 다 말했으면 마이크를 다시 눌러주세요';
   });
+
   recognition.addEventListener('end', () => {
+    // 사용자가 멈춘 게 아니면(자동으로 끊긴 것이면) 다시 이어서 듣는다
+    if (!userStopped) {
+      try { recognition.start(); return; } catch (e) {}
+    }
     listening = false;
     el('#micBtn').classList.remove('recording');
+    el('#micBtn').title = '음성으로 말하기';
+    updateModeUI();
   });
+
   recognition.addEventListener('result', (e) => {
-    const transcript = e.results[0][0].transcript;
-    const input = el('#input');
-    input.value = (input.value ? input.value + ' ' : '') + transcript;
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const best = e.results[i][0].transcript;
+      if (e.results[i].isFinal) finalText += best;
+      else interim += best;
+    }
+    const parts = [baseText, (finalText + interim).trim()].filter(Boolean);
+    el('#input').value = parts.join(' ');
   });
+
   recognition.addEventListener('error', (e) => {
-    addMessage('system', '음성 인식 오류: ' + e.error + ' (사파리로 열었는지, 마이크 권한을 허용했는지 확인해주세요)');
+    if (e.error === 'no-speech' || e.error === 'aborted') return; // 흔한 상황이라 조용히 넘김
+    userStopped = true;
+    const msg = e.error === 'not-allowed'
+      ? '마이크 권한이 거부됐어요. 주소창 왼쪽 자물쇠를 눌러 마이크를 허용해주세요.'
+      : '음성 인식 오류: ' + e.error;
+    addMessage('system', msg);
   });
 } else {
   el('#micBtn').disabled = true;
