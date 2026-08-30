@@ -535,6 +535,37 @@
     color: var(--accent);
   }
   .file-drop strong { display: block; margin-bottom: 2px; font-size: 13px; color: var(--ink); }
+  /* 목소리 고르기 */
+  .voice-list { display: flex; flex-direction: column; gap: 5px; }
+  .voice-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 7px 9px;
+    background: #fff;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .voice-row:hover { border-color: var(--accent); }
+  .voice-row.selected { border-color: var(--accent); background: var(--accent-soft); }
+  .voice-row .play {
+    border: 1px solid var(--border);
+    background: #fff;
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    cursor: pointer;
+    font-size: 11px;
+    line-height: 1;
+    padding: 0;
+  }
+  .voice-row .play:hover { border-color: var(--accent); }
+  .voice-row .vname { font-size: 13px; font-weight: 600; }
+  .voice-row .vtag { font-size: 11px; color: var(--sub); margin-left: auto; }
+  .voice-row.selected .vtag { color: var(--accent); font-weight: 600; }
   body.simple-mode .bubble { font-size: 17px; line-height: 1.75; }
   body.simple-mode .quick-btn { font-size: 14px; padding: 9px 16px; }
   body.simple-mode .composer textarea { font-size: 16px; }
@@ -545,7 +576,7 @@
 <div class="app">
   <aside class="sidebar" id="sidebar">
     <h1><span class="logo-badge">🧑‍🏫</span> 우리 아이 과외쌤</h1>
-    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v13)</span></div>
+    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v14)</span></div>
 
     <fieldset>
       <legend>모드</legend>
@@ -619,7 +650,12 @@
         <input type="checkbox" id="voiceOutToggle"> 선생님 답변을 음성으로 듣기
       </label>
       <input type="text" id="ttsProxy" placeholder="(선택) 좋은 목소리 서버 주소" style="margin-top:8px;">
-      <div class="field-hint">비워두면 컴퓨터에 기본으로 깔린 목소리를 씁니다. 주소를 넣으면 훨씬 자연스러운 구글 목소리로 읽어줘요.</div>
+      <div class="field-hint">비워두면 컴퓨터에 기본으로 깔린 목소리를 씁니다. 클라우드플레어에서 만든 중계 서버 주소를 넣으면 훨씬 자연스러운 구글 목소리로 읽어줘요.</div>
+
+      <div id="voicePickerWrap" class="hidden" style="margin-top:12px;">
+        <div class="field-hint" style="margin-bottom:6px;">▶ 를 눌러 들어보고 마음에 드는 목소리를 고르세요.</div>
+        <div class="voice-list" id="voiceList"></div>
+      </div>
     </fieldset>
 
     <details class="setup-group" id="connectGroup">
@@ -704,6 +740,7 @@ const state = {
   apiKey: '',
   voiceOut: false,
   ttsProxy: '',
+  voiceName: 'Leda',
   timetable: '',
   telegramToken: '',
   telegramChatId: '',
@@ -1210,10 +1247,13 @@ function stopAudio() {
 }
 
 async function fetchGoogleAudio(sentence, lang) {
+  const body = { text: sentence, lang };
+  // 한국어일 때만 고른 목소리를 쓴다 (영어 회화는 영어 목소리가 따로 있다)
+  if (lang === 'ko-KR' && state.voiceName) body.voice = 'ko-KR-Chirp3-HD-' + state.voiceName;
   const res = await fetch(state.ttsProxy.replace(/\/+$/, ''), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: sentence, lang })
+    body: JSON.stringify(body)
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.audio) {
@@ -1521,6 +1561,7 @@ el('#telegramChatId').value = state.telegramChatId;
 renderMeta();
 updateModeUI();
 updateConnectGroup();
+updateVoicePicker();
 
 el('#applyBtn').addEventListener('click', () => {
   state.apiKey = el('#apiKey').value.trim();
@@ -1531,6 +1572,7 @@ el('#applyBtn').addEventListener('click', () => {
   saveSettings();
   resetChat(true);
   updateConnectGroup();
+  updateVoicePicker();
   el('#sidebar').classList.remove('open');
 });
 
@@ -1709,6 +1751,93 @@ el('#timetableDrop').addEventListener('drop', (e) => {
   const file = e.dataTransfer.files && e.dataTransfer.files[0];
   readTimetableImage(file);
 });
+
+// ── 목소리 고르기 ────────────────────────────────────────────────────────
+// 구글 한국어 목소리 16종. 실제로 들어봐야 아는 거라 미리듣기 버튼을 붙인다.
+const VOICE_OPTIONS = [
+  { id: 'Leda',         label: '레다' },
+  { id: 'Aoede',        label: '아오데' },
+  { id: 'Kore',         label: '코레' },
+  { id: 'Zephyr',       label: '제피르' },
+  { id: 'Autonoe',      label: '오토노에' },
+  { id: 'Callirrhoe',   label: '칼리로에' },
+  { id: 'Despina',      label: '데스피나' },
+  { id: 'Erinome',      label: '에리노메' },
+  { id: 'Laomedeia',    label: '라오메데이아' },
+  { id: 'Sulafat',      label: '술라팟' },
+  { id: 'Vindemiatrix', label: '빈데미아트릭스' },
+  { id: 'Achernar',     label: '아케르나르' },
+  { id: 'Puck',         label: '퍽' },
+  { id: 'Charon',       label: '카론' },
+  { id: 'Fenrir',       label: '펜리르' },
+  { id: 'Orus',         label: '오루스' }
+];
+const PREVIEW_TEXT = '안녕! 오늘은 뭐부터 공부해볼까? 모르는 거 있으면 편하게 물어봐.';
+let previewAudio = null;
+
+async function previewVoice(voiceId, btn) {
+  if (!state.ttsProxy) {
+    alert('먼저 위 칸에 목소리 서버 주소를 넣고 "설정 적용"을 눌러주세요.');
+    return;
+  }
+  if (previewAudio) { previewAudio.pause(); previewAudio = null; }
+  const original = btn.textContent;
+  btn.textContent = '…';
+  try {
+    const res = await fetch(state.ttsProxy.replace(/\/+$/, ''), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: PREVIEW_TEXT, lang: 'ko-KR', voice: 'ko-KR-Chirp3-HD-' + voiceId })
+    });
+    const data = await res.json();
+    if (!data.audio) throw new Error(data.error || '목소리를 불러오지 못했어요');
+    previewAudio = new Audio('data:audio/mp3;base64,' + data.audio);
+    previewAudio.onended = () => { btn.textContent = original; };
+    await previewAudio.play();
+  } catch (e) {
+    btn.textContent = original;
+    alert('미리듣기 실패: ' + e.message);
+  }
+}
+
+function renderVoiceList() {
+  const list = el('#voiceList');
+  if (!list) return;
+  list.innerHTML = '';
+  VOICE_OPTIONS.forEach(v => {
+    const row = document.createElement('div');
+    row.className = 'voice-row' + (state.voiceName === v.id ? ' selected' : '');
+    row.dataset.voice = v.id;
+
+    const play = document.createElement('button');
+    play.type = 'button';
+    play.className = 'play';
+    play.textContent = '▶';
+    play.title = '들어보기';
+    play.addEventListener('click', (e) => { e.stopPropagation(); previewVoice(v.id, play); });
+
+    const name = document.createElement('span');
+    name.className = 'vname';
+    name.textContent = v.label;
+
+    const tag = document.createElement('span');
+    tag.className = 'vtag';
+    tag.textContent = state.voiceName === v.id ? '사용 중' : '고르기';
+
+    row.append(play, name, tag);
+    row.addEventListener('click', () => {
+      state.voiceName = v.id;
+      saveSettings();
+      renderVoiceList();
+    });
+    list.appendChild(row);
+  });
+}
+
+function updateVoicePicker() {
+  el('#voicePickerWrap').classList.toggle('hidden', !state.ttsProxy);
+  if (state.ttsProxy) renderVoiceList();
+}
 
 // 연결 설정: 다 채워졌으면 접어두고, 안 됐으면 펼쳐서 보여준다
 function updateConnectGroup() {
