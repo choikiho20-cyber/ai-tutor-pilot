@@ -536,7 +536,14 @@
   }
   .file-drop strong { display: block; margin-bottom: 2px; font-size: 13px; color: var(--ink); }
   /* 목소리 고르기 */
-  .voice-list { display: flex; flex-direction: column; gap: 5px; }
+  .voice-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    max-height: 260px;   /* 길어지면 목록 안에서만 스크롤 */
+    overflow-y: auto;
+    padding-right: 2px;
+  }
   .voice-row {
     display: flex;
     align-items: center;
@@ -576,7 +583,7 @@
 <div class="app">
   <aside class="sidebar" id="sidebar">
     <h1><span class="logo-badge">🧑‍🏫</span> 우리 아이 과외쌤</h1>
-    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v16)</span></div>
+    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v17)</span></div>
 
     <fieldset>
       <legend>모드</legend>
@@ -652,10 +659,15 @@
       <input type="text" id="ttsProxy" placeholder="(선택) 좋은 목소리 서버 주소" style="margin-top:8px;">
       <div class="field-hint">비워두면 컴퓨터에 기본으로 깔린 목소리를 씁니다. 클라우드플레어에서 만든 중계 서버 주소를 넣으면 훨씬 자연스러운 구글 목소리로 읽어줘요.</div>
 
-      <div id="voicePickerWrap" class="hidden" style="margin-top:12px;">
-        <div class="field-hint" style="margin-bottom:6px;">▶ 를 눌러 들어보고 마음에 드는 목소리를 고르세요.</div>
-        <div class="voice-list" id="voiceList"></div>
-      </div>
+      <details class="setup-group hidden" id="voicePickerWrap" style="margin-top:12px;">
+        <summary>
+          <span>🔊 목소리 고르기 <span class="setup-status done" id="voiceStatus">레다</span></span>
+        </summary>
+        <div class="group-body">
+          <div class="field-hint" style="margin-bottom:6px;">▶ 를 눌러 들어보고 마음에 드는 목소리를 고르세요.</div>
+          <div class="voice-list" id="voiceList"></div>
+        </div>
+      </details>
     </fieldset>
 
     <details class="setup-group" id="connectGroup">
@@ -1847,6 +1859,12 @@ function renderVoiceList() {
     });
     list.appendChild(row);
   });
+  // 접었을 때도 어떤 목소리를 쓰는지 보이게
+  const status = el('#voiceStatus');
+  if (status) {
+    const chosen = VOICE_OPTIONS.find(v => v.id === state.voiceName);
+    status.textContent = chosen ? chosen.label : '고르기';
+  }
 }
 
 function updateVoicePicker() {
