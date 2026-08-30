@@ -670,6 +670,17 @@ function buildSystemPrompt() {
 
 function el(sel) { return document.querySelector(sel); }
 
+// 응답에서 실제 답변 텍스트만 뽑는다.
+// 어려운 문제에는 앞에 생각(thinking) 블록이 먼저 오기 때문에 content[0]을 그냥 쓰면 안 된다.
+function extractText(data) {
+  if (!data || !Array.isArray(data.content)) return '';
+  return data.content
+    .filter(block => block.type === 'text' && block.text)
+    .map(block => block.text)
+    .join('\n')
+    .trim();
+}
+
 function renderMeta() {
   const bandLabel = BAND_LABEL[gradeBand(state.grade)];
   if (state.mode === 'conversation') {
@@ -823,7 +834,7 @@ async function sendMessage() {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-5',
-        max_tokens: 4096,
+        max_tokens: 8192,
         system: buildSystemPrompt(),
         messages: messagesToSend
       })
@@ -835,7 +846,8 @@ async function sendMessage() {
     }
 
     const data = await res.json();
-    const reply = data.content?.[0]?.text || '(응답을 받지 못했어요)';
+    // 어려운 문제일수록 앞에 생각(thinking) 블록이 붙으므로, 실제 텍스트 블록만 모아야 한다
+    const reply = extractText(data) || '(응답을 받지 못했어요)';
     state.history.push({ role: 'assistant', content: reply });
     addMessage('bot', reply);
     if (state.voiceOut) speak(reply);
@@ -1010,7 +1022,7 @@ async function readTimetableImage(file) {
 
     if (!res.ok) throw new Error('API 오류 (' + res.status + ')');
     const data = await res.json();
-    const text = (data.content && data.content[0] && data.content[0].text || '').trim();
+    const text = extractText(data);
     if (!text) throw new Error('내용을 읽지 못했어요');
 
     el('#timetable').value = text;
