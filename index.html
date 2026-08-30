@@ -576,7 +576,7 @@
 <div class="app">
   <aside class="sidebar" id="sidebar">
     <h1><span class="logo-badge">🧑‍🏫</span> 우리 아이 과외쌤</h1>
-    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v15)</span></div>
+    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v16)</span></div>
 
     <fieldset>
       <legend>모드</legend>
@@ -868,7 +868,7 @@ function buildSystemPrompt() {
 원칙:
 1. 항상 쉬운 영어로 먼저 말하고, 학생 수준(${bandLabel} ${state.grade})에 맞는 단어·문장 길이를 써.
 2. 학생이 영어로 답하면 대화를 자연스럽게 이어가면서, 문법·표현이 어색하면 대화 끝에 짧게 "Tip:"으로 한 번만 부드럽게 고쳐줘. 지적을 너무 자주 하지 마.
-3. 학생이 한국어로 물어보거나 막히면 그때만 한국어로 짧게 도와주고, 다시 영어 대화로 자연스럽게 돌아가.
+3. 학생이 한국어로 물어보면 절대 "영어로 말해봐"라고 되돌리지 말고, 그 질문에 한국어로 성심껏 답해줘. 영어와 상관없는 다른 과목(수학·과학·역사 등) 질문이어도 마찬가지로 제대로 답해라. 답을 다 한 뒤에 "그럼 다시 영어로 얘기해볼까?" 하고 가볍게 권하기만 해.
 4. 매 턴 끝에 짧은 후속 질문을 던져서 대화가 끊기지 않게 해.
 5. 말투: ${state.tone} 느낌을 유지해.
 6. 응답은 2~4문장 정도로 짧게, 실제 대화처럼 유지해.
@@ -1010,7 +1010,7 @@ function updateModeUI() {
   el('#againLessonBtn').classList.toggle('hidden', !isLesson);
 
   el('#input').placeholder = isConversation
-    ? 'Try saying something in English! 예: What did you do at school today?'
+    ? '영어로 말해보세요! 한국어 질문도 괜찮아요 (예: What did you do today?)'
     : isLesson
       ? '배우고 싶은 걸 말해보세요! 예: 이차방정식 배우고 싶어'
       : '어떤 과목이든 물어보세요! 예: 무신정변이 왜 일어났어?';
@@ -1433,7 +1433,16 @@ async function sendMessage() {
   const text = input.value.trim();
   if (!text && !pendingImage) return;
   if (!state.apiKey) {
-    addMessage('system', 'API 키를 먼저 왼쪽 사이드바에 입력하고 "설정 적용"을 눌러주세요.');
+    // 왜 안 되는지 바로 알 수 있게, 설정을 펼치고 그 자리로 데려간다
+    addMessage('system', '⚠️ 아직 Claude API 키가 없어서 답할 수 없어요. 왼쪽 "연결 설정"에 키를 넣고 "설정 적용"을 눌러주세요.');
+    const group = el('#connectGroup');
+    if (group) {
+      group.open = true;
+      el('#sidebar').classList.add('open');
+      group.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const keyInput = el('#apiKey');
+      if (keyInput) { keyInput.focus(); keyInput.style.borderColor = '#ef4444'; }
+    }
     return;
   }
 
@@ -1757,7 +1766,8 @@ el('#timetableDrop').addEventListener('drop', (e) => {
 
 // ── 목소리 고르기 ────────────────────────────────────────────────────────
 // 구글 한국어 목소리 16종. 실제로 들어봐야 아는 거라 미리듣기 버튼을 붙인다.
-const VOICE_OPTIONS = [
+// (var 로 선언해야 파일 위쪽에서 먼저 호출돼도 오류가 나지 않는다)
+var VOICE_OPTIONS = [
   { id: 'Leda',         label: '레다' },
   { id: 'Aoede',        label: '아오데' },
   { id: 'Kore',         label: '코레' },
@@ -1775,8 +1785,8 @@ const VOICE_OPTIONS = [
   { id: 'Fenrir',       label: '펜리르' },
   { id: 'Orus',         label: '오루스' }
 ];
-const PREVIEW_TEXT = '안녕! 오늘은 뭐부터 공부해볼까? 모르는 거 있으면 편하게 물어봐.';
-let previewAudio = null;
+var PREVIEW_TEXT = '안녕! 오늘은 뭐부터 공부해볼까? 모르는 거 있으면 편하게 물어봐.';
+var previewAudio = null;
 
 async function previewVoice(voiceId, btn) {
   // 아직 "설정 적용"을 안 눌렀어도 입력칸에 적힌 주소로 바로 들려준다
