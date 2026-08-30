@@ -222,6 +222,18 @@
     border: 1px solid var(--border);
     border-bottom-left-radius: 4px;
   }
+  /* 지금 읽어주는 문장을 짚어준다 (선생님이 칠판 짚어주듯) */
+  .sent {
+    transition: background 0.25s ease, color 0.25s ease;
+    border-radius: 4px;
+  }
+  .sent.reading {
+    background: var(--highlight);
+    color: var(--highlight-ink);
+    box-shadow: 0 0 0 3px var(--highlight);
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
   .msg.system .bubble {
     background: var(--accent-soft);
     color: var(--accent);
@@ -465,7 +477,7 @@
 <div class="app">
   <aside class="sidebar" id="sidebar">
     <h1><span class="logo-badge">🧑‍🏫</span> 우리 아이 과외쌤</h1>
-    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v9)</span></div>
+    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v10)</span></div>
 
     <fieldset>
       <legend>모드</legend>
@@ -672,6 +684,23 @@ function saveSettings() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
 }
 
+// 말하듯이 가르치는 규칙 — 글로 쓴 걸 읽는 느낌이 아니라 사람이 말하는 느낌을 내기 위한 것
+const SPEAKING_STYLE = `【말투 — 글이 아니라 '말'로 가르쳐라】
+네 설명은 소리 내어 읽힌다. 그러니 리포트 쓰듯 하지 말고, 학생 앞에 앉아 이야기하듯 말해라.
+- 문장을 짧게 끊어라. 한 문장에 한 가지만 담아라. 긴 문장은 듣다가 놓친다.
+- 말을 이어주는 표현을 자연스럽게 써라: "자, 그럼", "여기서 중요한 게", "그런데 말이야", "봐봐", "어때, 이해되지?"
+- 설명 중간에 질문을 던져라. "왜 그럴까?" 하고 잠깐 뜸을 들였다가 답해주면 훨씬 잘 들린다.
+- 딱딱한 정의부터 꺼내지 말고, 학생이 아는 것에서 출발해라. "이거 저번에 배운 그거랑 비슷해" 같은 식으로.
+- 나열할 때 번호만 찍지 말고 말로 이어라: "첫 번째는 이거고, 두 번째가 진짜 중요한데..."
+
+【과목마다 어울리는 이야기 방식이 다르다】
+학생이 물어본 과목을 보고 설명 방식을 바꿔라.
+- 역사·사회: 사건을 '이야기'로 풀어라. 인물의 입장, 그때의 긴장감, "만약 그때 이랬다면" 같은 상상을 섞어라. 연도 암기가 아니라 왜 그런 일이 벌어졌는지 흐름을 들려줘라.
+- 수학: 차근차근 논리를 따라가되, 각 단계마다 "왜 이렇게 하는지" 이유를 먼저 말해줘라. 답보다 '왜 이 방법을 떠올리는지'가 중요하다.
+- 과학: 눈에 보이는 일상 현상에서 출발해라. "냉장고 문 열면 왜 시원한 바람이 나올까?" 처럼 궁금하게 만든 뒤 원리로 들어가라.
+- 국어: 글쓴이가 왜 그렇게 썼을지, 어떤 마음이었을지를 같이 상상해라. 문학은 정답 맞히기가 아니라 읽는 법을 알려주는 것이다.
+- 영어: 문법 용어를 앞세우지 말고 실제로 쓰이는 상황을 먼저 보여줘라. "이럴 때 이렇게 말해" 하고 예문부터.`;
+
 // 화면 표기·수식·음성 관련 공통 규칙 (모든 모드에서 같이 쓴다)
 const FORMAT_RULES = `【표기 규칙 — 반드시 지킬 것】 이 답변은 화면에 그대로 표시되고, 동시에 기계가 소리 내어 읽어준다.
 ■ 쓰지 말 것 (기호 이름이 그대로 소리로 읽혀버린다):
@@ -733,6 +762,8 @@ function buildSystemPrompt() {
 6. 수업 한 단원이 끝나면 배운 내용을 3줄로 요약하고, 다음에 배울 내용을 예고해라.
 7. 학생이 중간에 다른 질문을 하면 그 질문에 답해주고, 답한 뒤 "그럼 아까 하던 데로 돌아갈까?" 하고 수업 흐름으로 자연스럽게 복귀해라.
 
+${SPEAKING_STYLE}
+
 ${FORMAT_RULES}`;
   }
 
@@ -790,7 +821,9 @@ ${answerStyleRule}
    - 강조가 필요하면 문장으로 강조해라 ("여기가 핵심이에요")
    - 단계는 "첫째,", "둘째," 또는 "1단계:" 처럼 말로 써라
    (수식을 소리로 읽는 변환은 프로그램이 알아서 처리하니, 너는 화면에 보기 좋은 정확한 수식만 쓰면 된다.)${bandNote}
-12. 학생이 기출문제 사진을 주고 예상문제를 만들어달라고 하면, 그 문제의 유형·난이도·자주 나오는 개념을 분석해서 비슷한 새 문제를 요청한 개수만큼 만들어줘. 단, "이 문제가 실제 시험에 그대로 나온다"고 절대 단정하지 말고, "이런 유형·개념이 나올 가능성이 높다"는 식으로 정직하게 안내해.`;
+12. 학생이 기출문제 사진을 주고 예상문제를 만들어달라고 하면, 그 문제의 유형·난이도·자주 나오는 개념을 분석해서 비슷한 새 문제를 요청한 개수만큼 만들어줘. 단, "이 문제가 실제 시험에 그대로 나온다"고 절대 단정하지 말고, "이런 유형·개념이 나올 가능성이 높다"는 식으로 정직하게 안내해.
+
+${SPEAKING_STYLE}`;
 }
 
 function el(sel) { return document.querySelector(sel); }
@@ -983,31 +1016,67 @@ if ('speechSynthesis' in window) {
   window.speechSynthesis.onvoiceschanged = () => { cachedVoice = null; cachedVoiceLang = null; };
 }
 
+// 문장 단위로 쪼갠다. 읽고 있는 문장을 화면에서 짚어주기 위해 필요하다.
+function splitSentences(text) {
+  return text
+    .split(/\n+|(?<=[.!?。？！])\s+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
 // 선생님이 말하는 중에 언제든 멈출 수 있어야 한다
 function stopSpeaking() {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
   const btn = el('#stopSpeakBtn');
   if (btn) btn.classList.add('hidden');
+  document.querySelectorAll('.sent.reading').forEach(s => s.classList.remove('reading'));
 }
 
-function speak(text) {
+// 지금 읽고 있는 문장을 강조하고, 화면 가운데로 끌어와서 놓치지 않게 한다
+function markReading(bubbleEl, idx) {
+  if (!bubbleEl) return;
+  bubbleEl.querySelectorAll('.sent.reading').forEach(s => s.classList.remove('reading'));
+  const target = bubbleEl.querySelector('.sent[data-idx="' + idx + '"]');
+  if (!target) return;
+  target.classList.add('reading');
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// 한 문장씩 따로 읽어서, 지금 읽는 문장을 정확히 짚어줄 수 있게 한다
+function speak(text, bubbleEl) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
-  const spoken = cleanForSpeech(text);
-  if (!spoken) return;
   const lang = state.mode === 'conversation' ? 'en-US' : 'ko-KR';
-  const utter = new SpeechSynthesisUtterance(spoken);
-  utter.lang = lang;
   const voice = pickVoice(lang);
-  if (voice) utter.voice = voice;
-  utter.rate = 1.02;
-  utter.pitch = 1.05;
   const btn = el('#stopSpeakBtn');
-  utter.onstart = () => { if (btn) btn.classList.remove('hidden'); };
-  utter.onend = () => { if (btn) btn.classList.add('hidden'); };
-  utter.onerror = () => { if (btn) btn.classList.add('hidden'); };
-  window.speechSynthesis.speak(utter);
+  const sentences = splitSentences(text);
+  let pending = 0;
+
+  sentences.forEach((sentence, idx) => {
+    const spoken = cleanForSpeech(sentence);
+    if (!spoken) return;
+    pending++;
+    const utter = new SpeechSynthesisUtterance(spoken);
+    utter.lang = lang;
+    if (voice) utter.voice = voice;
+    utter.rate = 1.02;
+    utter.pitch = 1.05;
+    utter.onstart = () => {
+      if (btn) btn.classList.remove('hidden');
+      markReading(bubbleEl, idx);
+    };
+    const done = () => {
+      pending--;
+      if (pending <= 0) {
+        if (btn) btn.classList.add('hidden');
+        document.querySelectorAll('.sent.reading').forEach(s => s.classList.remove('reading'));
+      }
+    };
+    utter.onend = done;
+    utter.onerror = done;
+    window.speechSynthesis.speak(utter);
+  });
 }
 
 function addMessage(role, text, imageDataUrl) {
@@ -1020,14 +1089,27 @@ function addMessage(role, text, imageDataUrl) {
     img.src = imageDataUrl;
     bubble.appendChild(img);
   }
+  let textEl = null;
   if (text) {
-    const textEl = document.createElement('div');
-    textEl.textContent = text;
+    textEl = document.createElement('div');
+    if (role === 'bot') {
+      // 읽고 있는 문장을 짚어줄 수 있게 문장 단위로 감싼다
+      splitSentences(text).forEach((sentence, idx) => {
+        const span = document.createElement('span');
+        span.className = 'sent';
+        span.dataset.idx = idx;
+        span.textContent = sentence + ' ';
+        textEl.appendChild(span);
+      });
+    } else {
+      textEl.textContent = text;
+    }
     bubble.appendChild(textEl);
   }
   wrap.appendChild(bubble);
   el('#messages').appendChild(wrap);
   el('#messages').scrollTop = el('#messages').scrollHeight;
+  return textEl;
 }
 
 function resetChat(withGreeting) {
@@ -1126,8 +1208,8 @@ async function sendMessage() {
     }
 
     state.history.push({ role: 'assistant', content: reply });
-    addMessage('bot', reply);
-    if (state.voiceOut) speak(reply);
+    const botTextEl = addMessage('bot', reply);
+    if (state.voiceOut) speak(reply, botTextEl);
   } catch (err) {
     addMessage('system', '오류가 발생했어요: ' + err.message);
   } finally {
