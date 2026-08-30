@@ -212,6 +212,19 @@
     line-height: 1.55;
     white-space: pre-wrap;
   }
+  /* 선생님 답변은 학생이 읽어야 하므로 훨씬 넉넉하게 */
+  .msg.bot .bubble {
+    max-width: 86%;
+    padding: 16px 20px;
+    font-size: 15.5px;
+    line-height: 2;
+    letter-spacing: -0.005em;
+    white-space: normal;
+  }
+  .msg.bot .bubble .para {
+    margin: 0 0 1.15em;
+  }
+  .msg.bot .bubble .para:last-child { margin-bottom: 0; }
   .msg.user .bubble {
     background: var(--bubble-user);
     color: #fff;
@@ -336,6 +349,8 @@
   }
   .speak-bar {
     padding: 0 18px 8px;
+    display: flex;
+    gap: 8px;
   }
   .speak-bar button {
     border: 1px solid #d97706;
@@ -477,7 +492,7 @@
 <div class="app">
   <aside class="sidebar" id="sidebar">
     <h1><span class="logo-badge">🧑‍🏫</span> 우리 아이 과외쌤</h1>
-    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v10)</span></div>
+    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v11)</span></div>
 
     <fieldset>
       <legend>모드</legend>
@@ -587,8 +602,9 @@
     <div class="guardian-banner hidden" id="guardianBanner">👨‍👩‍👧 저학년은 보호자와 함께 사용하는 걸 권장해요</div>
     <div class="messages" id="messages"></div>
     <div class="typing" id="typingIndicator" style="display:none;">선생님이 답변을 작성 중이에요...</div>
-    <div class="speak-bar hidden" id="stopSpeakBtn">
-      <button type="button">⏹ 그만 듣기</button>
+    <div class="speak-bar hidden" id="speakBar">
+      <button type="button" id="pauseSpeakBtn">⏸ 잠깐 멈춤</button>
+      <button type="button" id="stopSpeakBtn">⏹ 그만 듣기</button>
     </div>
     <div class="quick-actions" id="quickActions">
       <button class="quick-btn" id="startLessonBtn" type="button">🎓 오늘 진도 수업 시작</button>
@@ -692,6 +708,14 @@ const SPEAKING_STYLE = `【말투 — 글이 아니라 '말'로 가르쳐라】
 - 설명 중간에 질문을 던져라. "왜 그럴까?" 하고 잠깐 뜸을 들였다가 답해주면 훨씬 잘 들린다.
 - 딱딱한 정의부터 꺼내지 말고, 학생이 아는 것에서 출발해라. "이거 저번에 배운 그거랑 비슷해" 같은 식으로.
 - 나열할 때 번호만 찍지 말고 말로 이어라: "첫 번째는 이거고, 두 번째가 진짜 중요한데..."
+
+【문단 나누기 — 반드시 지켜라】
+학생이 읽어야 하는 글이다. 한 덩어리로 길게 쓰면 아무도 못 읽는다.
+- 한 문단은 2~3문장까지만. 절대 그 이상 붙이지 마라.
+- 문단과 문단 사이는 반드시 빈 줄 하나를 넣어라.
+- 이야기의 흐름이 바뀔 때마다 문단을 나눠라. 개념 설명 / 예시 / 정리 는 각각 다른 문단이다.
+- 여러 항목을 나열할 때도 항목마다 문단을 나눠라.
+- 전체 답변이 길어질 것 같으면, 한 번에 다 쏟지 말고 핵심만 말한 뒤 "더 자세히 볼까?" 하고 물어봐라.
 
 【과목마다 어울리는 이야기 방식이 다르다】
 학생이 물어본 과목을 보고 설명 방식을 바꿔라.
@@ -1016,6 +1040,20 @@ if ('speechSynthesis' in window) {
   window.speechSynthesis.onvoiceschanged = () => { cachedVoice = null; cachedVoiceLang = null; };
 }
 
+// 문단으로 나눈다. 빈 줄이 없으면 문장 3개씩 묶어서라도 나눠준다 (통글 방지).
+function splitParagraphs(text) {
+  let paras = text.split(/\n\s*\n+/).map(p => p.replace(/\n+/g, ' ').trim()).filter(Boolean);
+  const chunked = [];
+  paras.forEach(para => {
+    const sents = splitSentences(para);
+    if (sents.length <= 4) { chunked.push(para); return; }
+    for (let i = 0; i < sents.length; i += 3) {
+      chunked.push(sents.slice(i, i + 3).join(' '));
+    }
+  });
+  return chunked.length ? chunked : [text];
+}
+
 // 문장 단위로 쪼갠다. 읽고 있는 문장을 화면에서 짚어주기 위해 필요하다.
 function splitSentences(text) {
   return text
@@ -1024,13 +1062,33 @@ function splitSentences(text) {
     .filter(Boolean);
 }
 
-// 선생님이 말하는 중에 언제든 멈출 수 있어야 한다
+// 선생님이 말하는 중에 언제든 멈추거나 잠깐 쉴 수 있어야 한다
 function stopSpeaking() {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
-  const btn = el('#stopSpeakBtn');
-  if (btn) btn.classList.add('hidden');
+  const bar = el('#speakBar');
+  if (bar) bar.classList.add('hidden');
+  setPaused(false);
   document.querySelectorAll('.sent.reading').forEach(s => s.classList.remove('reading'));
+}
+
+// speechSynthesis.paused 는 브라우저마다 신뢰하기 어려워서 직접 상태를 들고 있는다
+let speechPaused = false;
+function setPaused(paused) {
+  speechPaused = paused;
+  const pauseBtn = el('#pauseSpeakBtn');
+  if (pauseBtn) pauseBtn.textContent = paused ? '▶️ 이어서 듣기' : '⏸ 잠깐 멈춤';
+}
+
+function togglePauseSpeaking() {
+  if (!('speechSynthesis' in window)) return;
+  if (speechPaused) {
+    window.speechSynthesis.resume();
+    setPaused(false);
+  } else {
+    window.speechSynthesis.pause();
+    setPaused(true);
+  }
 }
 
 // 지금 읽고 있는 문장을 강조하고, 화면 가운데로 끌어와서 놓치지 않게 한다
@@ -1049,8 +1107,10 @@ function speak(text, bubbleEl) {
   window.speechSynthesis.cancel();
   const lang = state.mode === 'conversation' ? 'en-US' : 'ko-KR';
   const voice = pickVoice(lang);
-  const btn = el('#stopSpeakBtn');
-  const sentences = splitSentences(text);
+  const btn = el('#speakBar');
+  // 화면에 그린 순서(문단→문장)와 똑같은 순서로 읽어야 강조 위치가 맞는다
+  const sentences = [];
+  splitParagraphs(text).forEach(para => splitSentences(para).forEach(s => sentences.push(s)));
   let pending = 0;
 
   sentences.forEach((sentence, idx) => {
@@ -1093,13 +1153,19 @@ function addMessage(role, text, imageDataUrl) {
   if (text) {
     textEl = document.createElement('div');
     if (role === 'bot') {
-      // 읽고 있는 문장을 짚어줄 수 있게 문장 단위로 감싼다
-      splitSentences(text).forEach((sentence, idx) => {
-        const span = document.createElement('span');
-        span.className = 'sent';
-        span.dataset.idx = idx;
-        span.textContent = sentence + ' ';
-        textEl.appendChild(span);
+      // 문단으로 나눠 읽기 편하게 하고, 문장 단위로 감싸서 읽는 곳을 짚어줄 수 있게 한다
+      let idx = 0;
+      splitParagraphs(text).forEach(para => {
+        const p = document.createElement('p');
+        p.className = 'para';
+        splitSentences(para).forEach(sentence => {
+          const span = document.createElement('span');
+          span.className = 'sent';
+          span.dataset.idx = idx++;
+          span.textContent = sentence + ' ';
+          p.appendChild(span);
+        });
+        textEl.appendChild(p);
       });
     } else {
       textEl.textContent = text;
@@ -1309,7 +1375,8 @@ el('#againLessonBtn').addEventListener('click', () => {
 
 el('#notifyParentBtn').addEventListener('click', sendParentNotification);
 
-// 선생님 말 끊기
+// 선생님 말 잠깐 멈추기 / 끊기
+el('#pauseSpeakBtn').addEventListener('click', togglePauseSpeaking);
 el('#stopSpeakBtn').addEventListener('click', stopSpeaking);
 
 // 대화 지우기: 설정은 그대로 두고 대화 내용만 비운다 (비용도 함께 초기화됨)
