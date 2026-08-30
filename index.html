@@ -589,7 +589,7 @@
 <div class="app">
   <aside class="sidebar" id="sidebar">
     <h1><span class="logo-badge">🧑‍🏫</span> 우리 아이 과외쌤</h1>
-    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v19)</span></div>
+    <div class="sub">설정을 바꾸면 다음 대화부터 반영돼요. <span style="opacity:.6">(v20)</span></div>
 
     <fieldset>
       <legend>모드</legend>
@@ -1144,6 +1144,23 @@ const MATH_LETTER_SOUND = {
   r: '알', s: '에스', t: '티', u: '유', v: '브이', w: '더블유', x: '엑스', y: '와이', z: '지'
 };
 
+// 앞말에 받침이 있으면 '은', 없으면 '는'. ("6는 0" 같은 어색한 발음 방지)
+function koreanTopicParticle(before) {
+  const ch = before.trim().slice(-1);
+  // 숫자는 읽는 소리 기준으로 판단 (예: 6=육 → 받침 있음)
+  const digitHasBatchim = { '0': true, '1': true, '3': true, '6': true, '7': true, '8': true,
+                            '2': false, '4': false, '5': false, '9': false };
+  if (/[0-9]/.test(ch)) return digitHasBatchim[ch] ? '은' : '는';
+  // 알파벳은 한글 발음 기준 (x=엑스, b=비 …)
+  const sound = MATH_LETTER_SOUND[ch.toLowerCase()];
+  const target = sound ? sound.slice(-1) : ch;
+  const code = target.charCodeAt(0);
+  if (code >= 0xAC00 && code <= 0xD7A3) {
+    return ((code - 0xAC00) % 28) !== 0 ? '은' : '는';
+  }
+  return '는';
+}
+
 function mathToKoreanSpeech(text) {
   let out = text
     // 남아있을 수 있는 LaTeX 잔재 정리
@@ -1165,16 +1182,25 @@ function mathToKoreanSpeech(text) {
     .replace(/([0-9a-zA-Z)\]])\s*\+\s*([0-9a-zA-Z(\[])/g, '$1 더하기 $2')
     .replace(/([0-9a-zA-Z)\]])\s+-\s+([0-9a-zA-Z(\[])/g, '$1 빼기 $2')
     .replace(/([0-9a-zA-Z)\]])\s*\/\s*([0-9a-zA-Z(\[])/g, '$2 분의 $1')
-    .replace(/([0-9a-zA-Z)\]])\s*=\s*/g, '$1 는 ')
     .replace(/([0-9a-zA-Z)\]])\s*<\s*([0-9a-zA-Z(\[])/g, '$1 보다 작고 $2')
     .replace(/([0-9a-zA-Z)\]])\s*>\s*([0-9a-zA-Z(\[])/g, '$1 보다 크고 $2')
     // 이제 거듭제곱을 한글로
     .replace(/\^\s*2\b/g, ' 제곱 ')
     .replace(/\^\s*3\b/g, ' 세제곱 ')
     .replace(/\^\s*(\d+)/g, ' 의 $1 제곱 ')
-    // 괄호는 "괄호"라고 읽어주고 닫을 때는 쉼표로 끊어 읽는다
-    .replace(/\(/g, ' 괄호 ')
-    .replace(/\)/g, ', ');
+    // 괄호는 소리 내어 "괄호"라고 읽으면 오히려 어색하다.
+    // 실제 선생님처럼 잠깐 끊어 읽도록 쉼표로만 바꾼다.
+    .replace(/\s*\(\s*/g, ', ')
+    .replace(/\s*\)\s*/g, ', ');
+
+  // '='는 괄호를 정리한 뒤에 처리해야, 바로 앞의 진짜 글자를 보고 은/는을 고를 수 있다
+  out = out
+    .replace(/([0-9a-zA-Z가-힣])[\s,]*=\s*/g, (m, before) => before + koreanTopicParticle(before) + ' ')
+    .replace(/=/g, ' 는 ')
+    // 쉼표가 겹치거나 문장 맨 앞에 오는 것 정리
+    .replace(/(\s*,\s*){2,}/g, ', ')
+    .replace(/^\s*,\s*/, '')
+    .replace(/\s+([,.])/g, '$1');
 
   // 홀로 쓰인 알파벳 한 글자는 한글 발음으로 (x → 엑스). 영어 단어는 건드리지 않는다.
   out = out.replace(/\b([a-zA-Z])\b/g, (m, ch) => MATH_LETTER_SOUND[ch.toLowerCase()] || m);
@@ -1316,12 +1342,13 @@ async function fetchGoogleAudio(sentence, lang) {
   return 'data:audio/mp3;base64,' + data.audio;
 }
 
-// 구글 음성으로 한 문장씩 순서대로 읽는다.
-// 다음 문장 소리를 미리 받아두어야 문장 사이가 끊기지 않고 자연스럽게 이어진다.
-async function speakWithGoogle(sentences, lang, bubbleEl, myToken) {
+// 구글 음성으로 '문단 단위'로 읽는다.
+// 문장마다 쪼개서 만들면 이어붙인 티가 나서 뚝뚝 끊기므로, 한 문단은 한 번에 만든다.
+// 읽는 동안 문장 강조는 문단 길이에 맞춰 시간을 나눠 표시한다.
+async function speakWithGoogle(chunks, lang, bubbleEl, myToken) {
   const btn = el('#speakBar');
-  const items = sentences
-    .map((s, idx) => ({ idx, spoken: cleanForSpeech(s) }))
+  const items = chunks
+    .map(c => ({ ...c, spoken: cleanForSpeech(c.text) }))
     .filter(it => it.spoken);
   if (!items.length) return;
 
@@ -1332,25 +1359,42 @@ async function speakWithGoogle(sentences, lang, bubbleEl, myToken) {
     const src = await nextFetch;
     if (myToken !== speakToken) return;
 
-    // 지금 문장을 재생하는 동안 다음 문장 소리를 미리 받아둔다
+    // 지금 문단을 재생하는 동안 다음 문단 소리를 미리 받아둔다
     nextFetch = (i + 1 < items.length)
       ? fetchGoogleAudio(items[i + 1].spoken, lang).catch(() => null)
       : null;
 
+    const chunk = items[i];
     await new Promise((resolve, reject) => {
       const audio = new Audio(src);
       currentAudio = audio;
+      let highlightTimer = null;
+
       audio.onplay = () => {
         if (btn) btn.classList.remove('hidden');
-        markReading(bubbleEl, items[i].idx);
+        markReading(bubbleEl, chunk.startIdx);
+        // 문단 안에 문장이 여러 개면, 재생 길이를 나눠 차례로 짚어준다
+        if (chunk.count > 1) {
+          let shown = 1;
+          const total = audio.duration && isFinite(audio.duration) ? audio.duration : null;
+          if (total) {
+            const step = (total / chunk.count) * 1000;
+            highlightTimer = setInterval(() => {
+              if (myToken !== speakToken || shown >= chunk.count) { clearInterval(highlightTimer); return; }
+              markReading(bubbleEl, chunk.startIdx + shown);
+              shown++;
+            }, step);
+          }
+        }
       };
-      audio.onended = resolve;
-      audio.onerror = () => reject(new Error('소리 재생 실패'));
-      audio.play().catch(reject);
+      const finish = (fn) => () => { if (highlightTimer) clearInterval(highlightTimer); fn(); };
+      audio.onended = finish(resolve);
+      audio.onerror = finish(() => reject(new Error('소리 재생 실패')));
+      audio.play().catch(finish(reject));
     });
 
     if (nextFetch === null && i + 1 < items.length) {
-      throw new Error('다음 문장 소리를 받지 못했어요');
+      throw new Error('다음 문단 소리를 받지 못했어요');
     }
   }
   if (myToken === speakToken) {
@@ -1396,13 +1440,24 @@ function speak(text, bubbleEl) {
   stopSpeaking();
   const myToken = ++speakToken;
   const lang = state.mode === 'conversation' ? 'en-US' : 'ko-KR';
-  // 화면에 그린 순서(문단→문장)와 똑같은 순서로 읽어야 강조 위치가 맞는다
+
+  // 소리는 '문단' 단위로 통째로 만든다. 문장마다 쪼개면 이어붙인 티가 나서 뚝뚝 끊긴다.
+  // 대신 문단 안에서 몇 번째 문장부터 시작하는지를 기록해, 강조 표시는 그대로 유지한다.
+  const chunks = [];
+  let sentenceIndex = 0;
+  splitParagraphs(text).forEach(para => {
+    const sents = splitSentences(para);
+    if (!sents.length) return;
+    chunks.push({ text: para, startIdx: sentenceIndex, count: sents.length });
+    sentenceIndex += sents.length;
+  });
+  if (!chunks.length) return;
+
   const sentences = [];
   splitParagraphs(text).forEach(para => splitSentences(para).forEach(s => sentences.push(s)));
-  if (!sentences.length) return;
 
   if (state.ttsProxy) {
-    speakWithGoogle(sentences, lang, bubbleEl, myToken).catch(err => {
+    speakWithGoogle(chunks, lang, bubbleEl, myToken).catch(err => {
       if (myToken !== speakToken) return;
       console.warn('구글 음성 실패, 기본 음성으로 전환:', err.message);
       speakWithBrowser(sentences, lang, bubbleEl);
